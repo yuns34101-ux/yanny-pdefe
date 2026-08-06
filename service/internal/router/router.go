@@ -106,6 +106,13 @@ func SetupRouter() *gin.Engine {
 			admins.DELETE("/:id", middleware.RequirePermission("admin:delete"), handler.DeleteAdmin)
 		}
 
+		// 文件上传（七牛云直传 Token）
+		upload := admin.Group("/upload")
+		upload.Use(middleware.AdminAuthMiddleware())
+		{
+			upload.POST("/token", middleware.RequirePermission("video:create"), handler.GetUploadToken)
+		}
+
 		// 数据统计
 			stats := admin.Group("/stats")
 			stats.Use(middleware.AdminAuthMiddleware())

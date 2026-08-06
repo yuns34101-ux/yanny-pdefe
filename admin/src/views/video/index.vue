@@ -110,11 +110,23 @@
         <el-form-item label="描述">
           <el-input v-model="form.description" type="textarea" :rows="2" maxlength="1000" />
         </el-form-item>
-        <el-form-item label="封面URL" prop="cover_url">
-          <el-input v-model="form.cover_url" placeholder="http://..." />
+        <el-form-item label="封面" prop="cover_url">
+          <div style="display:flex;gap:8px">
+            <el-input v-model="form.cover_url" placeholder="图片 URL 或点击上传" style="flex:1" />
+            <el-button @click="triggerCoverUpload" :loading="uploadingCover">
+              <el-icon><Upload /></el-icon> 上传
+            </el-button>
+          </div>
+          <input ref="coverInput" type="file" accept="image/*" style="display:none" @change="handleCoverUpload" />
         </el-form-item>
-        <el-form-item label="视频URL" prop="video_url">
-          <el-input v-model="form.video_url" placeholder="http://..." />
+        <el-form-item label="视频" prop="video_url">
+          <div style="display:flex;gap:8px">
+            <el-input v-model="form.video_url" placeholder="视频 URL 或点击上传" style="flex:1" />
+            <el-button @click="triggerVideoUpload" :loading="uploadingVideo">
+              <el-icon><Upload /></el-icon> 上传
+            </el-button>
+          </div>
+          <input ref="videoInput" type="file" accept="video/*" style="display:none" @change="handleVideoUpload" />
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="8">
@@ -185,7 +197,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { listVideos, createVideo, updateVideo, deleteVideo, listCategories, createCategory } from '@/api/video'
+import { listVideos, createVideo, updateVideo, deleteVideo, listCategories, createCategory, getUploadToken } from '@/api/video'
 import { listEntities } from '@/api/entity'
 import { useAuthStore } from '@/store/auth'
 import { ElMessage } from 'element-plus'
@@ -282,6 +294,66 @@ const rules = {
   category_id: [{ required: true, message: '选择分类', trigger: 'change' }],
   cover_url: [{ required: true, message: '必填' }],
   video_url: [{ required: true, message: '必填' }],
+}
+
+// 文件上传
+const coverInput = ref(null)
+const videoInput = ref(null)
+const uploadingCover = ref(false)
+const uploadingVideo = ref(false)
+
+const triggerCoverUpload = () => coverInput.value?.click()
+const triggerVideoUpload = () => videoInput.value?.click()
+
+const uploadToQiniu = async (file, fileType) => {
+  const res = await getUploadToken(fileType)
+  const { token, domain, upload_host } = res.data
+
+  const ext = file.name.split('.').pop()
+  const now = new Date()
+  const ts = now.toISOString().replace(/[-:]/g, '').replace(/\..+/, '')
+  const random = Math.random().toString(36).slice(2, 8)
+  const key = `${fileType}s/${now.toISOString().slice(0, 10).replace(/-/g, '')}/${ts}_${random}.${ext}`
+
+  const formData = new FormData()
+  formData.append('token', token)
+  formData.append('key', key)
+  formData.append('file', file)
+
+  const uploadRes = await fetch(upload_host, { method: 'POST', body: formData })
+  if (!uploadRes.ok) throw new Error('上传失败')
+  const result = await uploadRes.json()
+  return `${domain}/${result.key}`
+}
+
+const handleCoverUpload = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  uploadingCover.value = true
+  try {
+    form.cover_url = await uploadToQiniu(file, 'image')
+    ElMessage.success('封面上传成功')
+  } catch (err) {
+    ElMessage.error('封面上传失败：' + err.message)
+  } finally {
+    uploadingCover.value = false
+    if (coverInput.value) coverInput.value.value = ''
+  }
+}
+
+const handleVideoUpload = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  uploadingVideo.value = true
+  try {
+    form.video_url = await uploadToQiniu(file, 'video')
+    ElMessage.success('视频上传成功')
+  } catch (err) {
+    ElMessage.error('视频上传失败：' + err.message)
+  } finally {
+    uploadingVideo.value = false
+    if (videoInput.value) videoInput.value.value = ''
+  }
 }
 
 const openDialog = async (row) => {
