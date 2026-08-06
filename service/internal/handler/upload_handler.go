@@ -45,14 +45,14 @@ func GetUploadToken(c *gin.Context) {
 	}
 	policyJSON, _ := json.Marshal(policy)
 
-	// 1. 对 PutPolicy JSON 做 URL-safe Base64（无填充）
-	encodedPolicy := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(policyJSON)
+	// 1. 对 PutPolicy JSON 做 URL-safe Base64（带填充，与官方 SDK 一致）
+	encodedPolicy := base64.URLEncoding.EncodeToString(policyJSON)
 
 	// 2. HMAC-SHA1 签名
 	mac := hmac.New(sha1.New, []byte(cfg.SecretKey))
 	mac.Write([]byte(encodedPolicy))
 	sign := mac.Sum(nil)
-	encodedSign := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(sign)
+	encodedSign := base64.URLEncoding.EncodeToString(sign)
 
 	// 3. 组装 Token：<AK>:<encodedSign>:<encodedPolicy>
 	token := fmt.Sprintf("%s:%s:%s", cfg.AccessKey, encodedSign, encodedPolicy)
