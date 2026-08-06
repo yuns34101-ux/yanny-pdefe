@@ -4,6 +4,7 @@ import (
 	"errors"
 	"yanny-service/internal/model"
 	"yanny-service/internal/repository"
+	"yanny-service/internal/util/qiniu"
 
 	"gorm.io/gorm"
 )
@@ -74,17 +75,49 @@ func UpdateVideo(id uint64, updates map[string]interface{}) error {
 	return repository.UpdateVideo(id, updates)
 }
 
+// signVideoURLs 给视频的封面和视频 URL 加七牛签名（仅对七牛域名生效）
+func signVideoURLs(v *model.Video) {
+	if v.CoverURL != "" {
+		v.CoverURL = qiniu.GenerateCoverURL(v.CoverURL)
+	}
+	if v.VideoURL != "" {
+		v.VideoURL = qiniu.GenerateVideoURL(v.VideoURL)
+	}
+}
+
+// signVideoListURLs 给视频列表批量加签名
+func signVideoListURLs(videos []model.Video) {
+	for i := range videos {
+		signVideoURLs(&videos[i])
+	}
+}
+
 // GetVideosForMp 小程序端获取视频列表
 func GetVideosForMp(mpAccountID, entityID, categoryID uint64, page, pageSize int) ([]model.Video, int64, error) {
-	return repository.ListVideosForMp(mpAccountID, entityID, categoryID, page, pageSize)
+	videos, total, err := repository.ListVideosForMp(mpAccountID, entityID, categoryID, page, pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	signVideoListURLs(videos)
+	return videos, total, nil
 }
 
 // GetVideosForAdmin 管理后台获取视频列表
 func GetVideosForAdmin(mpAccountID, entityID, categoryID uint64, keyword string, status *int8, page, pageSize int, entityIDs []uint64) ([]model.Video, int64, error) {
-	return repository.ListVideosForAdmin(mpAccountID, entityID, categoryID, keyword, status, page, pageSize, entityIDs)
+	videos, total, err := repository.ListVideosForAdmin(mpAccountID, entityID, categoryID, keyword, status, page, pageSize, entityIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	signVideoListURLs(videos)
+	return videos, total, nil
 }
 
 // GetVideoDetail 获取视频详情
 func GetVideoDetail(videoID uint64) (*model.Video, error) {
-	return repository.FindVideoByID(videoID)
+	v, err := repository.FindVideoByID(videoID)
+	if err != nil {
+		return nil, err
+	}
+	signVideoURLs(v)
+	return v, nil
 }
