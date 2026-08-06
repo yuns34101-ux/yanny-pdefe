@@ -55,11 +55,14 @@ func ListVideosForMp(mpAccountID, entityID, categoryID uint64, page, pageSize in
 	return videos, total, err
 }
 
-// ListVideosForAdmin 管理后台视频列表
-func ListVideosForAdmin(mpAccountID, entityID, categoryID uint64, keyword string, status *int8, page, pageSize int) ([]model.Video, int64, error) {
+// ListVideosForAdmin 管理后台视频列表（支持 entityIDs 数据级过滤）
+func ListVideosForAdmin(mpAccountID, entityID, categoryID uint64, keyword string, status *int8, page, pageSize int, entityIDs []uint64) ([]model.Video, int64, error) {
 	var videos []model.Video
 	var total int64
 	db := database.DB.Model(&model.Video{})
+	if len(entityIDs) > 0 {
+		db = db.Where("entity_id IN ?", entityIDs)
+	}
 	if mpAccountID > 0 {
 		db = db.Where("mp_account_id = ?", mpAccountID)
 	}

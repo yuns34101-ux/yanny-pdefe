@@ -120,11 +120,15 @@
     </el-dialog>
 
     <!-- 绑定小程序弹窗 -->
-    <el-dialog v-model="bindVisible" title="管理小程序绑定" width="500px">
-      <div v-if="bindEntity">
+    <el-dialog v-model="bindVisible" title="管理小程序绑定" width="550px">
+      <div v-if="bindEntity" v-loading="bindLoading">
         <h4>{{ bindEntity.name }} - 已绑定小程序</h4>
-        <el-table :data="bindings" style="margin-top:12px">
-          <el-table-column prop="mp_account_id" label="小程序ID" width="100" />
+        <el-table :data="bindings" style="margin-top:12px" v-if="bindings.length">
+          <el-table-column label="小程序" min-width="180">
+            <template #default="{ row }">
+              {{ mpMap[row.mp_account_id] || '小程序 #' + row.mp_account_id }}
+            </template>
+          </el-table-column>
           <el-table-column prop="is_default" label="默认" width="80">
             <template #default="{ row }">
               <el-tag v-if="row.is_default" type="success" size="small">默认</el-tag>
@@ -140,11 +144,14 @@
             </template>
           </el-table-column>
         </el-table>
+        <el-empty v-else description="暂无绑定" :image-size="60" />
 
         <el-divider />
         <el-form :inline="true" :model="bindForm">
-          <el-form-item label="小程序ID">
-            <el-input-number v-model="bindForm.mp_account_id" :min="1" />
+          <el-form-item label="小程序">
+            <el-select v-model="bindForm.mp_account_id" placeholder="选择小程序" style="width:200px" filterable>
+              <el-option v-for="m in mpList" :key="m.id" :label="m.app_name" :value="m.id" />
+            </el-select>
           </el-form-item>
           <el-form-item label="设为默认">
             <el-switch v-model="bindForm.is_default" />
@@ -160,7 +167,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { listEntities, createEntity, updateEntity, deleteEntity, bindEntityMp, unbindEntityMp } from '@/api/entity'
+import { listEntities, createEntity, updateEntity, deleteEntity, bindEntityMp, unbindEntityMp, listMpAccounts, listEntityBindings } from '@/api/entity'
 import { useAuthStore } from '@/store/auth'
 import { ElMessage } from 'element-plus'
 
@@ -236,30 +243,47 @@ const handleDelete = async (id) => {
 
 // 绑定管理
 const bindVisible = ref(false)
+const bindLoading = ref(false)
 const bindEntity = ref(null)
 const bindings = ref([])
+const mpList = ref([])
+const mpMap = ref({})
 const bindForm = reactive({ mp_account_id: null, is_default: false })
 
 const manageBinding = async (row) => {
   bindEntity.value = row
   bindForm.mp_account_id = null
   bindForm.is_default = false
-  // TODO: 加载已绑定列表
-  bindings.value = []
+  bindLoading.value = true
+  try {
+    // 加载小程序账号列表
+    const mpRes = await listMpAccounts({ page_size: 200 })
+    mpList.value = mpRes.data || []
+    mpMap.value = {}
+    mpList.value.forEach(m => { mpMap.value[m.id] = m.app_name })
+
+    // 加载已绑定列表
+    const bindRes = await listEntityBindings(row.id)
+    bindings.value = bindRes.data || []
+  } catch { }
+  bindLoading.value = false
   bindVisible.value = true
 }
 
 const handleBind = async () => {
-  if (!bindForm.mp_account_id) return ElMessage.warning('请输入小程序ID')
+  if (!bindForm.mp_account_id) return ElMessage.warning('请选择小程序')
   await bindEntityMp({ entity_id: bindEntity.value.id, mp_account_id: bindForm.mp_account_id, is_default: bindForm.is_default ? 1 : 0 })
   ElMessage.success('绑定成功')
-  bindVisible.value = false
+  // 刷新绑定列表
+  bindings.value.push({ mp_account_id: bindForm.mp_account_id, is_default: bindForm.is_default })
+  bindForm.mp_account_id = null
+  bindForm.is_default = false
 }
 
 const handleUnbind = async (row) => {
   await unbindEntityMp({ entity_id: bindEntity.value.id, mp_account_id: row.mp_account_id })
   ElMessage.success('解绑成功')
-  bindVisible.value = false
+  bindings.value = bindings.value.filter(b => b.mp_account_id !== row.mp_account_id)
 }
 
 onMounted(fetchList)

@@ -88,7 +88,44 @@ func UpdateAdmin(id uint64, updates map[string]interface{}) error {
 
 // DeleteAdmin 删除管理员
 func DeleteAdmin(id uint64) error {
+	// 同时清理角色和主体绑定
+	database.DB.Where("admin_id = ?", id).Delete(&model.AdminRole{})
+	database.DB.Where("admin_id = ?", id).Delete(&model.AdminEntity{})
 	return database.DB.Delete(&model.Admin{}, id).Error
+}
+
+// ========== 数据级权限 ==========
+
+// GetAdminEntityIDs 获取管理员可管理的主体 ID 列表
+func GetAdminEntityIDs(adminID uint64) ([]uint64, error) {
+	var ids []uint64
+	err := database.DB.Model(&model.AdminEntity{}).
+		Where("admin_id = ?", adminID).Pluck("entity_id", &ids).Error
+	return ids, err
+}
+
+// AssignAdminEntities 分配管理员可管理的主体
+func AssignAdminEntities(adminID uint64, entityIDs []uint64) error {
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("admin_id = ?", adminID).Delete(&model.AdminEntity{}).Error; err != nil {
+			return err
+		}
+		for _, eid := range entityIDs {
+			if err := tx.Create(&model.AdminEntity{AdminID: adminID, EntityID: eid}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// IsSuperAdmin 判断是否为超级管理员
+func IsSuperAdmin(adminID uint64) bool {
+	var count int64
+	database.DB.Raw(`SELECT COUNT(1) FROM admin_roles ar
+		JOIN roles r ON ar.role_id = r.id
+		WHERE ar.admin_id = ? AND r.code = 'super_admin' AND r.status = 1`, adminID).Scan(&count)
+	return count > 0
 }
 
 // AssignRoles 给管理员分配角色

@@ -16,10 +16,13 @@ func FindEntityByID(id uint64) (*model.Entity, error) {
 	return &entity, nil
 }
 
-func ListEntities(keyword string, status *int8, page, pageSize int) ([]model.Entity, int64, error) {
+func ListEntities(keyword string, status *int8, page, pageSize int, entityIDs []uint64) ([]model.Entity, int64, error) {
 	var entities []model.Entity
 	var total int64
 	db := database.DB.Model(&model.Entity{})
+	if len(entityIDs) > 0 {
+		db = db.Where("id IN ?", entityIDs)
+	}
 	if keyword != "" {
 		db = db.Where("name LIKE ?", "%"+keyword+"%")
 	}

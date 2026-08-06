@@ -14,6 +14,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// getEntityScope 获取当前管理员的数据范围（entity ID 列表）
+// 超管返回 nil（代表全部），普通管理员返回分配的主体 ID 列表
+func getEntityScope(c *gin.Context) []uint64 {
+	adminID := middleware.GetAdminID(c)
+	if adminID == 0 || repository.IsSuperAdmin(adminID) {
+		return nil // nil = 全部
+	}
+	ids, _ := repository.GetAdminEntityIDs(adminID)
+	return ids
+}
+
 // AdminLogin 管理员登录
 func AdminLogin(c *gin.Context) {
 	var req dto.AdminLoginRequest
@@ -75,7 +86,7 @@ func ChangePassword(c *gin.Context) {
 
 // ========== 管理员 CRUD ==========
 
-// ListAdmins 管理员列表
+// ListAdmins 管理员列表（含角色和主体分配）
 func ListAdmins(c *gin.Context) {
 	var p dto.Pagination
 	if err := c.ShouldBindQuery(&p); err != nil {
@@ -87,7 +98,17 @@ func ListAdmins(c *gin.Context) {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())
 		return
 	}
-	dto.SuccessPage(c, admins, p.Page, p.PageSize, total)
+	// 填充每个管理员的实体 ID 列表（用于前端展示）
+	type AdminWithEntities struct {
+		model.Admin
+		EntityIDs []uint64 `json:"entity_ids"`
+	}
+	result := make([]AdminWithEntities, len(admins))
+	for i := range admins {
+		result[i].Admin = admins[i]
+		result[i].EntityIDs, _ = repository.GetAdminEntityIDs(admins[i].ID)
+	}
+	dto.SuccessPage(c, result, p.Page, p.PageSize, total)
 }
 
 // ========== 主体 CRUD ==========
@@ -115,7 +136,8 @@ func ListEntities(c *gin.Context) {
 	if err := c.ShouldBindQuery(&q); err != nil {
 		q.Page, q.PageSize = 1, 20
 	}
-	entities, total, err := repository.ListEntities(q.Keyword, q.Status, q.Page, q.PageSize)
+	scope := getEntityScope(c)
+	entities, total, err := repository.ListEntities(q.Keyword, q.Status, q.Page, q.PageSize, scope)
 	if err != nil {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())
 		return
@@ -206,6 +228,21 @@ func ListMpAccounts(c *gin.Context) {
 }
 
 // ========== 绑定管理 ==========
+
+// ListEntityBindings 查询主体的绑定列表
+func ListEntityBindings(c *gin.Context) {
+	entityID, ok := parseUintParam(c, "id")
+	if !ok {
+		dto.Error(c, dto.ErrCodeParamInvalid, "ID 参数格式无效")
+		return
+	}
+	bindings, err := repository.FindBindingsByEntity(entityID)
+	if err != nil {
+		dto.Error(c, dto.ErrCodeInternal, err.Error())
+		return
+	}
+	dto.Success(c, bindings)
+}
 
 // BindEntityMp 绑定主体-小程序
 func BindEntityMp(c *gin.Context) {
@@ -385,10 +422,11 @@ func UpdateUserStatus(c *gin.Context) {
 // CreateAdmin 创建管理员
 func CreateAdmin(c *gin.Context) {
 	var req struct {
-		Username string   `json:"username" binding:"required"`
-		Password string   `json:"password" binding:"required"`
-		RealName string   `json:"real_name"`
-		RoleIDs  []uint64 `json:"role_ids"`
+		Username  string   `json:"username" binding:"required"`
+		Password  string   `json:"password" binding:"required"`
+		RealName  string   `json:"real_name"`
+		RoleIDs   []uint64 `json:"role_ids"`
+		EntityIDs []uint64 `json:"entity_ids"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, dto.ErrCodeParamInvalid, "参数无效")
@@ -398,6 +436,9 @@ func CreateAdmin(c *gin.Context) {
 	if err != nil {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())
 		return
+	}
+	if len(req.EntityIDs) > 0 {
+		repository.AssignAdminEntities(admin.ID, req.EntityIDs)
 	}
 	dto.Success(c, admin)
 }
@@ -410,9 +451,10 @@ func UpdateAdmin(c *gin.Context) {
 		return
 	}
 	var req struct {
-		RealName string   `json:"real_name"`
-		Status   *int8    `json:"status"`
-		RoleIDs  []uint64 `json:"role_ids"`
+		RealName  string   `json:"real_name"`
+		Status    *int8    `json:"status"`
+		RoleIDs   []uint64 `json:"role_ids"`
+		EntityIDs []uint64 `json:"entity_ids"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, dto.ErrCodeParamInvalid, "参数无效")
@@ -421,6 +463,9 @@ func UpdateAdmin(c *gin.Context) {
 	if err := service.UpdateAdmin(id, req.RealName, req.Status, req.RoleIDs); err != nil {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())
 		return
+	}
+	if len(req.EntityIDs) > 0 {
+		repository.AssignAdminEntities(id, req.EntityIDs)
 	}
 	dto.Success(c, nil)
 }

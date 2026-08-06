@@ -80,8 +80,8 @@ func GetVideosForMp(mpAccountID, entityID, categoryID uint64, page, pageSize int
 }
 
 // GetVideosForAdmin 管理后台获取视频列表
-func GetVideosForAdmin(mpAccountID, entityID, categoryID uint64, keyword string, status *int8, page, pageSize int) ([]model.Video, int64, error) {
-	return repository.ListVideosForAdmin(mpAccountID, entityID, categoryID, keyword, status, page, pageSize)
+func GetVideosForAdmin(mpAccountID, entityID, categoryID uint64, keyword string, status *int8, page, pageSize int, entityIDs []uint64) ([]model.Video, int64, error) {
+	return repository.ListVideosForAdmin(mpAccountID, entityID, categoryID, keyword, status, page, pageSize, entityIDs)
 }
 
 // GetVideoDetail 获取视频详情

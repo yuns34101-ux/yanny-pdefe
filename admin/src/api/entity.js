@@ -13,6 +13,7 @@ export function createMpAccount(data) { return request.post('/mp-accounts', data
 export function updateMpAccount(id, data) { return request.put(`/mp-accounts/${id}`, data) }
 
 // ========== 绑定管理 ==========
+export function listEntityBindings(entityId) { return request.get(`/bindings/entity/${entityId}`) }
 export function bindEntityMp(data) { return request.post('/bindings', data) }
 export function unbindEntityMp(data) { return request.delete('/bindings', { data }) }
 

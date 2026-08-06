@@ -51,6 +51,16 @@ type Permission struct {
 
 func (Permission) TableName() string { return "permissions" }
 
+// AdminEntity 管理员-主体绑定（数据级权限）
+type AdminEntity struct {
+	ID        uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	AdminID   uint64    `gorm:"not null;uniqueIndex:uk_admin_entity" json:"admin_id"`
+	EntityID  uint64    `gorm:"not null;uniqueIndex:uk_admin_entity;index:idx_entity" json:"entity_id"`
+	CreatedAt time.Time `gorm:"not null;autoCreateTime" json:"created_at"`
+}
+
+func (AdminEntity) TableName() string { return "admin_entities" }
+
 // AdminRole 管理员-角色关联
 type AdminRole struct {
 	ID        uint64    `gorm:"primaryKey;autoIncrement" json:"id"`

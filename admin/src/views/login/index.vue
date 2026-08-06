@@ -76,14 +76,20 @@ const handleLogin = async () => {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  padding: 20px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 .login-card {
   width: 420px;
+  max-width: 100%;
   padding: 40px;
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+@media (max-width: 480px) {
+  .login-card { padding: 24px; }
+  .login-header h1 { font-size: 22px; }
 }
 .login-header {
   text-align: center;

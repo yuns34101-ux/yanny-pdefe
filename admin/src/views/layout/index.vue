@@ -207,6 +207,11 @@ const handleChangePassword = async () => {
 .layout-main {
   background-color: #f0f2f5;
   padding: 20px;
-  min-height: calc(100vh - 60px);
+  flex: 1;
+  overflow-y: auto;
 }
-</style>
+/* 响应式 */
+@media (max-width: 768px) {
+  .layout-aside { position: absolute; z-index: 100; height: 100vh; }
+  .layout-main { padding: 12px; }
+}</style>

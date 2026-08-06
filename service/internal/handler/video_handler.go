@@ -105,7 +105,7 @@ func ListVideos(c *gin.Context) {
 		q.Page, q.PageSize = 1, 20
 	}
 	videos, total, err := service.GetVideosForAdmin(q.MpAccountID, q.EntityID,
-		q.CategoryID, q.Keyword, q.Status, q.Page, q.PageSize)
+		q.CategoryID, q.Keyword, q.Status, q.Page, q.PageSize, getEntityScope(c))
 	if err != nil {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())
 		return

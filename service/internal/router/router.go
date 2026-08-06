@@ -60,6 +60,7 @@ func SetupRouter() *gin.Engine {
 		binding := admin.Group("/bindings")
 		binding.Use(middleware.AdminAuthMiddleware())
 		{
+			binding.GET("/entity/:id", middleware.RequirePermission("entity:view"), handler.ListEntityBindings)
 			binding.POST("", middleware.RequirePermission("entity:edit"), handler.BindEntityMp)
 			binding.DELETE("", middleware.RequirePermission("entity:edit"), handler.UnbindEntityMp)
 		}
@@ -105,7 +106,17 @@ func SetupRouter() *gin.Engine {
 			admins.DELETE("/:id", middleware.RequirePermission("admin:delete"), handler.DeleteAdmin)
 		}
 
-		roles := admin.Group("/roles")
+		// 数据统计
+			stats := admin.Group("/stats")
+			stats.Use(middleware.AdminAuthMiddleware())
+			{
+				stats.GET("/dashboard", middleware.RequirePermission("analytics:view"), handler.GetDashboardStats)
+				stats.GET("/trend", middleware.RequirePermission("analytics:view"), handler.GetTrendData)
+				stats.GET("/top-videos", middleware.RequirePermission("analytics:view"), handler.GetTopVideos)
+				stats.GET("/regions", middleware.RequirePermission("analytics:view"), handler.GetRegionStats)
+			}
+
+			roles := admin.Group("/roles")
 		roles.Use(middleware.AdminAuthMiddleware())
 		{
 			roles.GET("", middleware.RequirePermission("role:view"), handler.ListRoles)
