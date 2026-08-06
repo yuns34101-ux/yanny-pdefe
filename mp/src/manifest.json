@@ -1,0 +1,28 @@
+{
+  "name": "Yanny",
+  "appid": "wxff0ecb7fddca4ecc",
+  "description": "扬昵短视频",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "wxff0ecb7fddca4ecc",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "postcss": true,
+      "minified": true
+    },
+    "usingComponents": true,
+    "permission": {
+      "scope.userLocation": {
+        "desc": "用于展示地域相关内容"
+      }
+    },
+    "requiredPrivateInfos": ["getLocation", "chooseAddress"]
+  },
+  "uniStatistics": {
+    "enable": false
+  },
+  "vueVersion": "3"
+}

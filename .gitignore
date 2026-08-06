@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+yanny-service.exe
+*.exe
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Config with secrets (keep template only)
+service/config.yaml
+
+# UniApp
+mp/unpackage/
+mp/.hbuilderx/
+
+# Temp
+tmp/
+tools/
+/tmp/

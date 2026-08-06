@@ -1,0 +1,109 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { post } from '@/utils/request'
+
+export const useUserStore = defineStore('user', () => {
+  const userInfo = ref(null)
+  const token = ref(uni.getStorageSync('mp_token') || '')
+  const platform = ref('wechat') // wechat | douyin | h5 | mock
+
+  const isLoggedIn = computed(() => !!token.value)
+  const userId = computed(() => userInfo.value?.user_id || 0)
+
+  // 检测当前平台
+  function detectPlatform() {
+    // #ifdef MP-WEIXIN
+    return 'wechat'
+    // #endif
+    // #ifdef MP-DOUYIN
+    return 'douyin'
+    // #endif
+    // #ifdef H5
+    return 'h5'
+    // #endif
+    return 'mock'
+  }
+
+  // 静默登录（进场时调用，无 UI）
+  async function silentLogin() {
+    const p = detectPlatform()
+    platform.value = p
+
+    if (p === 'wechat') {
+      // 微信小程序：wx.login 获取 code
+      return new Promise((resolve, reject) => {
+        uni.login({
+          provider: 'weixin',
+          success: async (res) => {
+            try {
+              await doLogin(res.code, 'wechat')
+              resolve()
+            } catch (e) { reject(e) }
+          },
+          fail: (e) => reject(e),
+        })
+      })
+    }
+
+    // H5 / mock / 其他：直接使用设备标识
+    const deviceId = uni.getStorageSync('device_id') || `dev_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    uni.setStorageSync('device_id', deviceId)
+    return doLogin(deviceId, p)
+  }
+
+  // 实际登录请求
+  async function doLogin(code, platformType) {
+    const appId = getAppId()
+    const res = await post('/login', {
+      code,
+      platform: platformType,
+      app_id: appId,
+    })
+    token.value = res.data.token
+    userInfo.value = {
+      user_id: res.data.user_id,
+      nickname: res.data.nickname,
+      avatar_url: res.data.avatar_url,
+    }
+    uni.setStorageSync('mp_token', res.data.token)
+    return res.data
+  }
+
+  // 更新用户信息（手机号授权后）
+  async function updatePhone(e) {
+    if (!e?.detail?.encryptedData) return
+    try {
+      await post('/login', {
+        code: '',
+        platform: platform.value,
+        encrypted_data: e.detail.encryptedData,
+        iv: e.detail.iv,
+      })
+      uni.showToast({ title: '手机号绑定成功', icon: 'success' })
+    } catch (e) {
+      console.error('手机号绑定失败', e)
+    }
+  }
+
+  // 获取 AppID
+  function getAppId() {
+    // #ifdef MP-WEIXIN
+    return 'wxff0ecb7fddca4ecc'
+    // #endif
+    // #ifdef H5
+    return 'h5-yanny'
+    // #endif
+    return ''
+  }
+
+  function logout() {
+    token.value = ''
+    userInfo.value = null
+    uni.removeStorageSync('mp_token')
+  }
+
+  return {
+    userInfo, token, platform, isLoggedIn, userId,
+    silentLogin, doLogin, updatePhone, logout, detectPlatform,
+  }
+})

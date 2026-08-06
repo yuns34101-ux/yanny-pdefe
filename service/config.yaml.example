@@ -1,0 +1,45 @@
+server:
+  port: 8088
+  mode: debug  # debug / release / test
+
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  user: root
+  password: ""
+  database: yanny
+  charset: utf8mb4
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600
+
+redis:
+  host: 127.0.0.1
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+
+jwt:
+  secret: "change-me-in-production"
+  expire_hours: 2
+  mp_expire_hours: 720
+
+dynamic_key: "change-me-in-production"
+
+anti_brute_force:
+  max_attempts: 5
+  lock_duration: 1800
+  window_minutes: 10
+
+wechat:
+  app_id: ""
+  app_secret: ""
+
+qiniu:
+  access_key: ""
+  secret_key: ""
+  bucket: ""
+  domain: ""
+  region: "z0"
+  callback_url: ""
