@@ -9,8 +9,14 @@ import (
 
 func ListCategories(entityID, mpAccountID uint64) ([]model.VideoCategory, error) {
 	var categories []model.VideoCategory
-	err := database.DB.Where("entity_id = ? AND mp_account_id = ? AND status = 1", entityID, mpAccountID).
-		Order("sort_order DESC").Find(&categories).Error
+	db := database.DB.Model(&model.VideoCategory{})
+	if entityID > 0 {
+		db = db.Where("entity_id = ?", entityID)
+	}
+	if mpAccountID > 0 {
+		db = db.Where("mp_account_id = ?", mpAccountID)
+	}
+	err := db.Order("sort_order DESC").Find(&categories).Error
 	return categories, err
 }
 

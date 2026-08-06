@@ -37,7 +37,7 @@ echo "🗄️  检查数据库迁移..."
 for f in "$PROJECT_DIR"/db/v*.sql; do
     if [ -f "$f" ]; then
         echo "  执行: $(basename $f)"
-        mysql -u yanny -p"${DB_PASSWORD}" yanny < "$f" 2>/dev/null || echo "  ⚠️ 迁移可能已执行或失败，继续..."
+        mysql -u root -p"${DB_PASSWORD}" yanny-pdefe < "$f" 2>/dev/null || echo "  ⚠️ 迁移可能已执行或失败，继续..."
     fi
 done
 

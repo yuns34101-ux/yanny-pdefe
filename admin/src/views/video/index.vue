@@ -4,13 +4,13 @@
       <!-- 主体 + 搜索 -->
       <el-form :inline="true" :model="query">
         <el-form-item label="主体">
-          <el-select v-model="query.entity_id" placeholder="选择主体" clearable style="width:160px" @change="onEntityChange">
+          <el-select v-model="query.entity_id" placeholder="选择主体" clearable style="width:200px" @change="onEntityChange">
             <el-option v-for="e in entities" :key="e.id" :label="e.name" :value="e.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="分类">
-          <el-select v-model="query.category_id" placeholder="全部分类" clearable style="width:140px">
-            <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
+          <el-select v-model="query.category_id" placeholder="全部分类" clearable style="width:160px">
+            <el-option v-for="c in searchCategories" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
@@ -151,12 +151,12 @@
     <el-dialog v-model="categoryVisible" title="分类管理" width="550px">
       <el-form :inline="true" style="margin-bottom:16px">
         <el-form-item label="主体">
-          <el-select v-model="catEntityId" placeholder="选择主体" @change="loadCategories">
+          <el-select v-model="catEntityId" placeholder="选择主体" clearable style="width:220px" @change="loadDialogCategories">
             <el-option v-for="e in entities" :key="e.id" :label="e.name" :value="e.id" />
           </el-select>
         </el-form-item>
       </el-form>
-      <el-table :data="categories" size="small" v-if="catEntityId">
+      <el-table :data="dialogCategories" size="small" v-if="catEntityId">
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="name" label="名称" />
         <el-table-column prop="sort_order" label="排序" width="80" />
@@ -197,8 +197,9 @@ const hasPerm = (code) => authStore.hasPermission(code)
 const entities = ref([])
 
 // 分类
-const categories = ref([])
-const formCategories = ref([]) // 视频表单中按 entity 过滤的分类
+const searchCategories = ref([])  // 搜索栏分类下拉
+const dialogCategories = ref([])  // 分类管理弹窗表格
+const formCategories = ref([])    // 视频表单中按 entity 过滤的分类
 const categoryVisible = ref(false)
 const catEntityId = ref(null)
 const catForm = reactive({ name: '', sort_order: 0 })
@@ -207,9 +208,14 @@ const loadEntities = async () => {
   try { const res = await listEntities({ page_size: 200 }); entities.value = res.data || [] } catch { }
 }
 
-const loadCategories = async () => {
-  if (!catEntityId.value) { categories.value = []; return }
-  try { const res = await listCategories({ entity_id: catEntityId.value }); categories.value = res.data || [] } catch { }
+const loadSearchCategories = async (entityId) => {
+  if (!entityId) { searchCategories.value = []; return }
+  try { const res = await listCategories({ entity_id: entityId }); searchCategories.value = res.data || [] } catch { }
+}
+
+const loadDialogCategories = async () => {
+  if (!catEntityId.value) { dialogCategories.value = []; return }
+  try { const res = await listCategories({ entity_id: catEntityId.value }); dialogCategories.value = res.data || [] } catch { }
 }
 
 const loadFormCategories = async (entityId) => {
@@ -218,7 +224,9 @@ const loadFormCategories = async (entityId) => {
 }
 
 const onEntityChange = () => {
+  loadSearchCategories(query.entity_id)
   loadFormCategories(query.entity_id)
+  query.category_id = null  // 切换主体时重置分类筛选
   fetchList()
 }
 const onFormEntityChange = (val) => { loadFormCategories(val) }
@@ -226,7 +234,7 @@ const onFormEntityChange = (val) => { loadFormCategories(val) }
 const openCategoryDialog = () => {
   if (!catEntityId.value && entities.value.length) {
     catEntityId.value = query.entity_id || entities.value[0]?.id
-    loadCategories()
+    loadDialogCategories()
   }
   categoryVisible.value = true
 }
@@ -236,7 +244,12 @@ const handleAddCategory = async () => {
   await createCategory({ entity_id: catEntityId.value, mp_account_id: 1, name: catForm.name, sort_order: catForm.sort_order })
   ElMessage.success('添加成功')
   catForm.name = ''
-  loadCategories()
+  loadDialogCategories()
+  // 同时刷新搜索栏分类（如果是同一个主体）
+  if (catEntityId.value === query.entity_id) {
+    loadSearchCategories(query.entity_id)
+    loadFormCategories(query.entity_id)
+  }
 }
 
 // 视频列表
@@ -300,7 +313,7 @@ const statusType = (s) => ({ 0: 'warning', 1: 'success', 2: 'info' }[s] || 'info
 const statusText = (s) => ({ 0: '待审核', 1: '已发布', 2: '已下架' }[s] || '未知')
 const formatDuration = (s) => { const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, '0')}` }
 
-onMounted(() => { loadEntities(); fetchList() })
+onMounted(() => { loadEntities(); fetchList(); loadSearchCategories(query.entity_id) })
 </script>
 
 <style scoped>
