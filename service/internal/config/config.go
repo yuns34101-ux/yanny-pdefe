@@ -80,12 +80,13 @@ type AntiBruteForceConfig struct {
 
 // QiniuConfig 七牛云配置
 type QiniuConfig struct {
-	AccessKey   string `yaml:"access_key"`
-	SecretKey   string `yaml:"secret_key"`
-	Bucket      string `yaml:"bucket"`
-	Domain      string `yaml:"domain"`
-	Region      string `yaml:"region"`
-	CallbackURL string `yaml:"callback_url"`
+	AccessKey    string `yaml:"access_key"`
+	SecretKey    string `yaml:"secret_key"`
+	Bucket       string `yaml:"bucket"`
+	Domain       string `yaml:"domain"`
+	Region       string `yaml:"region"`
+	CallbackURL  string `yaml:"callback_url"`
+	AntiTheftKey string `yaml:"anti_theft_key"` // 时间戳防盗链 key
 }
 
 var AppConfig *Config

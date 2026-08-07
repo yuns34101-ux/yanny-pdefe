@@ -43,3 +43,4 @@ qiniu:
   domain: ""
   region: "z0"
   callback_url: ""
+  anti_theft_key: ""  # 时间戳防盗链 key（CDN 域名 → 访问控制 → 时间戳防盗链）
