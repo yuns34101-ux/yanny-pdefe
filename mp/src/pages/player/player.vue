@@ -66,6 +66,9 @@
             <view class="bottom-entity" v-if="entityInfo">
               <image :src="entityInfo.logo_url || '/static/logo.png'" class="entity-logo" />
               <text class="entity-name">{{ entityInfo.name }}</text>
+              <view class="follow-pill" :class="{ followed: entityStore.followed }" @click.stop="handleFollow">
+                <text>{{ entityStore.followed ? '已关注' : '+ 关注' }}</text>
+              </view>
             </view>
             <view class="video-desc">
               <text class="video-title-text">{{ v.title }}</text>
@@ -128,16 +131,18 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useVideoStore } from '@/store/video'
 import { useUserStore } from '@/store/user'
+import { useEntityStore } from '@/store/entity'
 import { createTrackPayload } from '@/utils/sign'
 import { get, post } from '@/utils/request'
 
 const videoStore = useVideoStore()
 const userStore = useUserStore()
+const entityStore = useEntityStore()
 
 // 视频数据
 const videoList = ref([])
 const currentIndex = ref(0)
-const entityInfo = ref(null)
+const entityInfo = computed(() => entityStore.entity)
 const page = ref(1)
 const totalCount = ref(0)
 const pageSize = 10
@@ -194,7 +199,15 @@ async function loadInteractionStatus(videoId) {
       v._liked = res.liked
       v._favored = res.favored
     }
+    entityStore.followed = !!res.followed
   } catch { /* ignore */ }
+}
+
+// 加载当前视频所属主体信息（logo/名称/关注状态）
+function loadEntityInfo(v) {
+  if (!v?.entity_id) return
+  if (entityStore.entity?.id === v.entity_id) return
+  entityStore.fetchEntityInfo(v.entity_id)
 }
 
 // ========== 滑动事件 ==========
@@ -214,6 +227,7 @@ function onSwipeChange(e) {
   if (newVideo) {
     currentVideo.value = newVideo
     loadInteractionStatus(newVideo.id)
+    loadEntityInfo(newVideo)
   }
 
   // 预加载
@@ -247,6 +261,11 @@ async function handleFavorite(v) {
   const favored = await videoStore.toggleFavorite(v.id)
   v._favored = favored
   v.collect_count += favored ? 1 : -1
+}
+
+async function handleFollow() {
+  if (!requireLogin()) return
+  await entityStore.toggleFollow()
 }
 
 function handleComment(v) {
@@ -365,7 +384,12 @@ onLoad((query) => {
         currentIndex.value = idx
         currentVideo.value = videoList.value[idx]
         loadInteractionStatus(parseInt(videoId))
+        loadEntityInfo(currentVideo.value)
       }
+    } else if (videoList.value.length) {
+      currentVideo.value = videoList.value[0]
+      loadInteractionStatus(currentVideo.value.id)
+      loadEntityInfo(currentVideo.value)
     }
   })
 })
@@ -392,7 +416,11 @@ onUnmounted(() => {
 .bottom-bar { position: absolute; left: 20rpx; right: 120rpx; bottom: 40rpx; z-index: 10; }
 .bottom-entity { display: flex; align-items: center; margin-bottom: 12rpx; }
 .entity-logo { width: 48rpx; height: 48rpx; border-radius: 24rpx; margin-right: 12rpx; }
-.entity-name { font-size: 26rpx; color: #fff; }
+.entity-name { font-size: 26rpx; color: #fff; margin-right: 16rpx; }
+.follow-pill { padding: 4rpx 20rpx; border-radius: 24rpx; border: 1rpx solid #fff; }
+.follow-pill text { font-size: 20rpx; color: #fff; }
+.follow-pill.followed { border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.15); }
+.follow-pill.followed text { color: rgba(255,255,255,0.8); }
 .video-title-text { font-size: 28rpx; color: #fff; font-weight: 500; }
 .video-desc-text { font-size: 24rpx; color: rgba(255,255,255,0.8); margin-top: 6rpx; }
 

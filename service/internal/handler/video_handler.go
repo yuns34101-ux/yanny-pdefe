@@ -45,6 +45,21 @@ func ListCategories(c *gin.Context) {
 	dto.Success(c, categories)
 }
 
+// MpListCategories 小程序端分类列表（公开，无需管理员鉴权）
+func MpListCategories(c *gin.Context) {
+	entityID, _ := parseUintQuery(c, "entity_id")
+	mpAccountID := c.GetUint64("mp_account_id")
+	if mpAccountID == 0 {
+		mpAccountID, _ = parseUintQuery(c, "mp_account_id")
+	}
+	categories, err := repository.ListCategories(entityID, mpAccountID)
+	if err != nil {
+		dto.Error(c, dto.ErrCodeInternal, err.Error())
+		return
+	}
+	dto.Success(c, categories)
+}
+
 // ========== 视频管理（管理后台） ==========
 
 // CreateVideo 创建视频

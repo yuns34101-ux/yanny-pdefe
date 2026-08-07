@@ -100,3 +100,62 @@ func BindEntityMp(entityID, mpAccountID uint64, isDefault int8) error {
 func UnbindEntityMp(entityID, mpAccountID uint64) error {
 	return repository.UnbindEntityMp(entityID, mpAccountID)
 }
+
+// ========== 小程序端主体信息 ==========
+
+// EntityWithStats 主体信息 + 实时统计
+type EntityWithStats struct {
+	*model.Entity
+	VideoCount    int64 `json:"video_count"`
+	FollowerCount int64 `json:"follower_count"`
+	Followed      bool  `json:"followed"`
+}
+
+// GetEntityForMp 小程序端获取主体详情及统计信息
+// entityID 优先使用；为 0 时通过 mpAccountID 反查默认绑定的主体
+// userID 为 0 表示游客，followed 恒为 false
+func GetEntityForMp(entityID, mpAccountID, userID uint64) (*EntityWithStats, error) {
+	if entityID == 0 && mpAccountID > 0 {
+		bindings, err := repository.FindBindingsByMp(mpAccountID)
+		if err != nil {
+			return nil, err
+		}
+		for _, b := range bindings {
+			if b.IsDefault == 1 {
+				entityID = b.EntityID
+				break
+			}
+		}
+		if entityID == 0 && len(bindings) > 0 {
+			entityID = bindings[0].EntityID
+		}
+	}
+	if entityID == 0 {
+		return nil, errors.New("主体不存在")
+	}
+
+	entity, err := repository.FindEntityByID(entityID)
+	if err != nil {
+		return nil, err
+	}
+	videoCount, err := repository.CountVideosByEntity(entityID)
+	if err != nil {
+		return nil, err
+	}
+	followerCount, err := repository.CountFollowersByEntity(entityID)
+	if err != nil {
+		return nil, err
+	}
+	followed := false
+	if userID > 0 {
+		if follow, err := repository.FindFollow(mpAccountID, userID, entityID); err == nil && follow.Status == 1 {
+			followed = true
+		}
+	}
+	return &EntityWithStats{
+		Entity:        entity,
+		VideoCount:    videoCount,
+		FollowerCount: followerCount,
+		Followed:      followed,
+	}, nil
+}

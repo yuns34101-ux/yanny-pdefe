@@ -65,3 +65,16 @@ type Share struct {
 }
 
 func (Share) TableName() string { return "shares" }
+
+// Follow 关注
+type Follow struct {
+	ID          uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	MpAccountID uint64    `gorm:"not null;uniqueIndex:uk_user_entity" json:"mp_account_id"`
+	UserID      uint64    `gorm:"not null;uniqueIndex:uk_user_entity" json:"user_id"`
+	EntityID    uint64    `gorm:"not null;uniqueIndex:uk_user_entity;index:idx_entity" json:"entity_id"`
+	Status      int8      `gorm:"not null;default:1;index:idx_entity" json:"status"`
+	CreatedAt   time.Time `gorm:"not null;autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"not null;autoUpdateTime" json:"updated_at"`
+}
+
+func (Follow) TableName() string { return "follows" }

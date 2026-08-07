@@ -142,6 +142,12 @@ func SetupRouter() *gin.Engine {
 	{
 		mpApi.POST("/login", middleware.MpAPILimiter(), handler.MpLogin)
 
+		// 主体信息（游客可看）
+		mpApi.GET("/entity", middleware.MpAuthOptional(), handler.MpGetEntity)
+
+		// 分类（游客可看）
+		mpApi.GET("/categories", middleware.MpAuthOptional(), handler.MpListCategories)
+
 		// 视频（游客可浏览，去重+防刷）
 		mpVideos := mpApi.Group("/videos")
 		mpVideos.Use(middleware.MpAuthOptional(), middleware.MpAPILimiter(), middleware.VideoViewAntiAbuse())
@@ -168,6 +174,7 @@ func SetupRouter() *gin.Engine {
 			mpAuth.GET("/favorites", handler.MpMyFavorites)
 			mpAuth.POST("/share", handler.MpRecordShare)
 			mpAuth.GET("/interaction-status", handler.MpInteractionStatus)
+			mpAuth.POST("/follow", handler.MpToggleFollow)
 		}
 
 		// 埋点上报（签名校验 + 限流）

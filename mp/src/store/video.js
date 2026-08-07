@@ -70,10 +70,16 @@ export const useVideoStore = defineStore('video', () => {
     await post('/share', { video_id: videoId, share_type: shareType })
   }
 
-  // 获取互动状态
+  // 获取互动状态（liked / favored / followed）
   async function getInteractionStatus(videoId) {
     const res = await get('/interaction-status', { video_id: videoId })
     return res.data
+  }
+
+  // 切换关注
+  async function toggleFollow(entityId) {
+    const res = await post('/follow', { entity_id: entityId })
+    return res.data.followed
   }
 
   // ========== 评论 ==========
@@ -93,7 +99,7 @@ export const useVideoStore = defineStore('video', () => {
   return {
     videos, categories, currentPage, totalCount, pageSize, loading, hasMore,
     fetchVideos, fetchNextPage, fetchCategories,
-    toggleLike, toggleFavorite, recordShare, getInteractionStatus,
+    toggleLike, toggleFavorite, recordShare, getInteractionStatus, toggleFollow,
     fetchComments, postComment,
   }
 })

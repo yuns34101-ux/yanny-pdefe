@@ -1,5 +1,5 @@
 // API 基础配置
-const BASE_URL = 'http://127.0.0.1:8088/api/v1/mp'
+const BASE_URL = 'https://www-pdefe.yuangs.com/api/v1/mp'
 
 // 请求封装
 export function request(url, options = {}) {

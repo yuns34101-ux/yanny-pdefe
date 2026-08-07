@@ -196,8 +196,41 @@ func GetInteractionStatus(mpAccountID, userID, videoID uint64) map[string]bool {
 	if fav, err := repository.FindFavorite(mpAccountID, userID, videoID); err == nil && fav.Status == 1 {
 		favored = true
 	}
-	return map[string]bool{
-		"liked":   liked,
-		"favored": favored,
+	followed := false
+	if video, err := repository.FindVideoByID(videoID); err == nil {
+		if follow, err := repository.FindFollow(mpAccountID, userID, video.EntityID); err == nil && follow.Status == 1 {
+			followed = true
+		}
 	}
+	return map[string]bool{
+		"liked":    liked,
+		"favored":  favored,
+		"followed": followed,
+	}
+}
+
+// ToggleFollow 切换关注状态
+func ToggleFollow(mpAccountID, userID, entityID uint64) (bool, error) {
+	existing, err := repository.FindFollow(mpAccountID, userID, entityID)
+	if err != nil {
+		follow := &model.Follow{
+			MpAccountID: mpAccountID,
+			UserID:      userID,
+			EntityID:    entityID,
+			Status:      1,
+		}
+		if err := repository.CreateFollow(follow); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	newStatus := int8(1)
+	if existing.Status == 1 {
+		newStatus = 0
+	}
+	if err := repository.UpdateFollowStatus(existing.ID, newStatus); err != nil {
+		return false, err
+	}
+	return newStatus == 1, nil
 }

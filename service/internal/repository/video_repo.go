@@ -113,3 +113,11 @@ func UpdateVideoCount(videoID uint64, field string, delta int) error {
 	return database.DB.Model(&model.Video{}).Where("id = ?", videoID).
 		UpdateColumn(field, database.DB.Raw(field+" + ?", delta)).Error
 }
+
+// CountVideosByEntity 统计主体下已发布视频数
+func CountVideosByEntity(entityID uint64) (int64, error) {
+	var count int64
+	err := database.DB.Model(&model.Video{}).
+		Where("entity_id = ? AND status = 1", entityID).Count(&count).Error
+	return count, err
+}

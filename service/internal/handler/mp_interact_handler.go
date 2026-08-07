@@ -9,6 +9,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// ========== 主体信息 ==========
+
+// MpGetEntity 小程序端获取主体详情及统计信息（游客可看）
+func MpGetEntity(c *gin.Context) {
+	entityID, _ := parseUintQuery(c, "entity_id")
+	mpAccountID := middleware.GetMpAccountID(c)
+	if mpAccountID == 0 {
+		mpAccountID, _ = parseUintQuery(c, "mp_account_id")
+	}
+	userID := middleware.GetUserID(c)
+	entity, err := service.GetEntityForMp(entityID, mpAccountID, userID)
+	if err != nil {
+		dto.Error(c, dto.ErrCodeEntityNotFound, "主体不存在")
+		return
+	}
+	dto.Success(c, entity)
+}
+
 // ========== 评论 ==========
 
 // MpCreateComment 发表评论（需登录）
@@ -149,6 +167,27 @@ func MpRecordShare(c *gin.Context) {
 		return
 	}
 	dto.Success(c, nil)
+}
+
+// ========== 关注 ==========
+
+// MpToggleFollow 切换关注（需登录）
+func MpToggleFollow(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	mpAccountID := middleware.GetMpAccountID(c)
+	var req struct {
+		EntityID uint64 `json:"entity_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		dto.Error(c, dto.ErrCodeParamInvalid, "参数无效")
+		return
+	}
+	followed, err := service.ToggleFollow(mpAccountID, userID, req.EntityID)
+	if err != nil {
+		dto.Error(c, dto.ErrCodeInternal, err.Error())
+		return
+	}
+	dto.Success(c, gin.H{"followed": followed})
 }
 
 // ========== 用户互动状态查询 ==========

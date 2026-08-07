@@ -109,6 +109,31 @@ func CreateShare(share *model.Share) error {
 	return database.DB.Create(share).Error
 }
 
+// ========== 关注 ==========
+
+func FindFollow(mpAccountID, userID, entityID uint64) (*model.Follow, error) {
+	var follow model.Follow
+	err := database.DB.Where("mp_account_id = ? AND user_id = ? AND entity_id = ?",
+		mpAccountID, userID, entityID).First(&follow).Error
+	return &follow, err
+}
+
+func CreateFollow(follow *model.Follow) error {
+	return database.DB.Create(follow).Error
+}
+
+func UpdateFollowStatus(id uint64, status int8) error {
+	return database.DB.Model(&model.Follow{}).Where("id = ?", id).
+		Updates(map[string]interface{}{"status": status}).Error
+}
+
+func CountFollowersByEntity(entityID uint64) (int64, error) {
+	var count int64
+	err := database.DB.Model(&model.Follow{}).
+		Where("entity_id = ? AND status = 1", entityID).Count(&count).Error
+	return count, err
+}
+
 // ========== 埋点 ==========
 
 func BuildViewLog(mpAccountID uint64, userID uint64, videoID uint64, watchDuration uint, isComplete int8, source, ip string) *model.ViewLog {
