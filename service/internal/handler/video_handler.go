@@ -4,6 +4,7 @@ import (
 	"yanny-service/internal/dto"
 	"yanny-service/internal/repository"
 	"yanny-service/internal/service"
+	"yanny-service/internal/util/qiniu"
 
 	"github.com/gin-gonic/gin"
 )
@@ -74,8 +75,8 @@ func CreateVideo(c *gin.Context) {
 		CategoryID:    req.CategoryID,
 		Title:         req.Title,
 		Description:   req.Description,
-		CoverURL:      req.CoverURL,
-		VideoURL:      req.VideoURL,
+		CoverURL:      qiniu.StripQuery(req.CoverURL),
+		VideoURL:      qiniu.StripQuery(req.VideoURL),
 		Duration:      req.Duration,
 		Width:         req.Width,
 		Height:        req.Height,
@@ -133,10 +134,10 @@ func UpdateVideo(c *gin.Context) {
 		updates["description"] = req.Description
 	}
 	if req.CoverURL != "" {
-		updates["cover_url"] = req.CoverURL
+		updates["cover_url"] = qiniu.StripQuery(req.CoverURL)
 	}
 	if req.VideoURL != "" {
-		updates["video_url"] = req.VideoURL
+		updates["video_url"] = qiniu.StripQuery(req.VideoURL)
 	}
 	if req.CategoryID > 0 {
 		updates["category_id"] = req.CategoryID

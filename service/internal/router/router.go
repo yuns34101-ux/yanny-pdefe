@@ -111,6 +111,8 @@ func SetupRouter() *gin.Engine {
 		upload.Use(middleware.AdminAuthMiddleware())
 		{
 			upload.POST("/token", middleware.RequirePermission("video:create"), handler.GetUploadToken)
+			upload.POST("/check", middleware.RequirePermission("video:create"), handler.CheckMediaAsset)
+			upload.POST("/confirm", middleware.RequirePermission("video:create"), handler.ConfirmMediaAsset)
 		}
 
 		// 数据统计

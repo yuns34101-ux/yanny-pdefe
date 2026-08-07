@@ -139,7 +139,7 @@ func CreateEntity(c *gin.Context) {
 		dto.Error(c, dto.ErrCodeParamInvalid, "参数无效："+err.Error())
 		return
 	}
-	entity, err := service.CreateEntity(req.Name, req.LogoURL, req.Description,
+	entity, err := service.CreateEntity(req.Name, qiniu.StripQuery(req.LogoURL), req.Description,
 		req.ContactPhone, req.ContactEmail, req.Address, req.Extra,
 		req.SortOrder, req.Status)
 	if err != nil {
@@ -193,7 +193,7 @@ func UpdateEntity(c *gin.Context) {
 		dto.Error(c, dto.ErrCodeParamInvalid, "参数无效")
 		return
 	}
-	if err := service.UpdateEntity(id, req.Name, req.LogoURL, req.Description,
+	if err := service.UpdateEntity(id, req.Name, qiniu.StripQuery(req.LogoURL), req.Description,
 		req.ContactPhone, req.ContactEmail, req.Address, req.Extra,
 		req.SortOrder, req.Status); err != nil {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())
@@ -226,7 +226,7 @@ func CreateMpAccount(c *gin.Context) {
 		return
 	}
 	mp, err := service.CreateMpAccount(req.AppID, req.AppSecret, req.AppName,
-		req.AppIcon, req.Description, req.Status)
+		qiniu.StripQuery(req.AppIcon), req.Description, req.Status)
 	if err != nil {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())
 		return
@@ -340,6 +340,9 @@ func UpdateMpAccount(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, dto.ErrCodeParamInvalid, "参数无效")
 		return
+	}
+	if iconURL, ok := req["app_icon"].(string); ok {
+		req["app_icon"] = qiniu.StripQuery(iconURL)
 	}
 	if err := repository.UpdateMpAccount(id, req); err != nil {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())

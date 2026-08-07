@@ -12,23 +12,29 @@ import (
 )
 
 // SignURL 对七牛私有空间 URL 签名，支持多媒体处理参数
-// rawURL: 原始文件 URL
+// rawURL: 原始文件 URL（若已带签名参数会自动剥离，避免重复签名）
 // process: 处理指令（如 "imageView2/1/w/300/h/300"），空字符串表示不处理
 // ttl: 签名有效期
 func SignURL(rawURL, process string, ttl time.Duration) string {
+	// 防御：剥离已有的 query string（历史脏数据可能已经是签名过的完整 URL）
+	baseURL := rawURL
+	if idx := strings.Index(rawURL, "?"); idx >= 0 {
+		baseURL = rawURL[:idx]
+	}
+
 	cfg := config.AppConfig.Qiniu
 	if cfg.SecretKey == "" || cfg.AccessKey == "" {
 		if process != "" {
-			return rawURL + "?" + process
+			return baseURL + "?" + process
 		}
-		return rawURL
+		return baseURL
 	}
 
 	// 构造待签名 URL：<base>?<process>&e=<deadline>
-	url := rawURL
+	url := baseURL
 	if process != "" {
 		// 处理参数之间用 | 分隔，最终拼成一个 ?process&e=deadline 的格式
-		url = rawURL + "?" + process
+		url = baseURL + "?" + process
 	}
 
 	deadline := time.Now().Add(ttl).Unix()
@@ -50,6 +56,15 @@ func SignImageURL(rawURL string) string {
 	rawURL = EnsureProtocol(rawURL)
 	ttl := time.Duration(config.AppConfig.Qiniu.GetMediaTTL()) * time.Hour
 	return SignURL(rawURL, ImageProcessRule, ttl)
+}
+
+// StripQuery 剥离 URL 中的签名/处理参数，仅保留纯净路径部分
+// 用于写库前清洗：避免把前端回显的已签名 URL 误存为原始值
+func StripQuery(rawURL string) string {
+	if idx := strings.Index(rawURL, "?"); idx >= 0 {
+		return rawURL[:idx]
+	}
+	return rawURL
 }
 
 // EnsureProtocol 补全缺少的 https:// 前缀
