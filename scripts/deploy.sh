@@ -5,6 +5,7 @@ set -e  # 任何命令执行失败则立即退出
 PROJECT_DIR="/www/wwwroot/yanny-pdefe"
 SERVICE_DIR="$PROJECT_DIR/service"
 ADMIN_DIR="$PROJECT_DIR/admin"
+MP_DIR="$PROJECT_DIR/mp"
 BINARY="$SERVICE_DIR/binary"
 CONFIG_FILE="$SERVICE_DIR/config.yaml"
 CONFIG_EXAMPLE="$SERVICE_DIR/config.yaml.example"
@@ -56,6 +57,17 @@ if [ -d "$ADMIN_DIR" ]; then
     echo "✅ 前端构建完成"
 else
     echo "⚠️  未找到 admin 目录，跳过前端构建"
+fi
+
+# 5.1 构建小程序 H5 版本
+if [ -d "$MP_DIR" ]; then
+    echo "📱 构建小程序 H5 版本..."
+    cd "$MP_DIR"
+    [ -d "node_modules" ] || npm install
+    npm run build:h5
+    echo "✅ H5 版本构建完成：$MP_DIR/dist/build/h5"
+else
+    echo "⚠️  未找到 mp 目录，跳过 H5 构建"
 fi
 
 # 6. 停止旧进程

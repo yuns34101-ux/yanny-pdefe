@@ -338,7 +338,31 @@ npm run build:mp-weixin
 const BASE_URL = 'https://yanny-api.example.com/api/v1/mp'
 ```
 
-### 9.3 微信开发者工具
+### 9.3 命令行上传体验版（推荐，脱离微信开发者工具）
+
+基于官方 `miniprogram-ci`，可在服务器/CI 环境直接完成上传，无需打开微信开发者工具。
+
+**首次准备**：
+
+1. 微信公众平台 → 开发管理 → 开发设置 → 小程序代码上传密钥 → 生成并下载私钥文件，保存为 `mp/upload-key.pem`（该文件已在 `.gitignore` 中忽略，禁止提交）。
+2. 同一页面把执行上传的服务器 IP 加入 IP 白名单。
+3. `mp/src/manifest.json` 中的 `versionName` 是本次上传的版本号，发布前先手动改好。
+
+**执行上传**：
+
+```bash
+# 先出预览二维码（不写入体验版，用于快速验证）
+node scripts/upload-mp.js --preview --desc "预览说明"
+
+# 正式上传体验版
+node scripts/upload-mp.js --desc "版本说明"
+```
+
+上传成功后，微信公众平台后台「版本管理 → 体验版本」会出现新版本，扫码即可体验。
+
+参数说明：`--key` 指定私钥路径（默认 `mp/upload-key.pem`），`--robot` 指定小程序 CI 机器人编号（默认 1）。
+
+### 9.4 微信开发者工具（备选方式）
 
 1. 打开微信开发者工具
 2. 导入 `dist/build/mp-weixin/`

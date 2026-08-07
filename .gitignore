@@ -29,6 +29,9 @@ service/config.yaml
 mp/unpackage/
 mp/.hbuilderx/
 
+# 小程序代码上传密钥（禁止提交）
+upload-key*.pem
+
 # Temp
 tmp/
 tools/
