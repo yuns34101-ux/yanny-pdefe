@@ -111,27 +111,37 @@ type EntityWithStats struct {
 	Followed      bool  `json:"followed"`
 }
 
+// ResolveEntityID 解析主体 ID：entityID 优先使用；为 0 时通过 mpAccountID 反查默认绑定的主体
+// 小程序账号与主体目前是 1 对 1 关系，客户端提交 entity_id=0 时兜底为当前绑定主体，避免"主体不存在"异常
+func ResolveEntityID(entityID, mpAccountID uint64) (uint64, error) {
+	if entityID > 0 {
+		return entityID, nil
+	}
+	if mpAccountID == 0 {
+		return 0, errors.New("主体不存在")
+	}
+	bindings, err := repository.FindBindingsByMp(mpAccountID)
+	if err != nil {
+		return 0, err
+	}
+	for _, b := range bindings {
+		if b.IsDefault == 1 {
+			return b.EntityID, nil
+		}
+	}
+	if len(bindings) > 0 {
+		return bindings[0].EntityID, nil
+	}
+	return 0, errors.New("主体不存在")
+}
+
 // GetEntityForMp 小程序端获取主体详情及统计信息
 // entityID 优先使用；为 0 时通过 mpAccountID 反查默认绑定的主体
 // userID 为 0 表示游客，followed 恒为 false
 func GetEntityForMp(entityID, mpAccountID, userID uint64) (*EntityWithStats, error) {
-	if entityID == 0 && mpAccountID > 0 {
-		bindings, err := repository.FindBindingsByMp(mpAccountID)
-		if err != nil {
-			return nil, err
-		}
-		for _, b := range bindings {
-			if b.IsDefault == 1 {
-				entityID = b.EntityID
-				break
-			}
-		}
-		if entityID == 0 && len(bindings) > 0 {
-			entityID = bindings[0].EntityID
-		}
-	}
-	if entityID == 0 {
-		return nil, errors.New("主体不存在")
+	entityID, err := ResolveEntityID(entityID, mpAccountID)
+	if err != nil {
+		return nil, err
 	}
 
 	entity, err := repository.FindEntityByID(entityID)

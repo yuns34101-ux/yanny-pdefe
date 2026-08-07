@@ -28,6 +28,8 @@
             @play="onPlay(v, i)"
             @ended="onEnded(v)"
             @error="onError(v)"
+            @timeupdate="onTimeUpdate(v, $event)"
+            @loadedmetadata="onLoadedMetadata(v, $event)"
           />
           <!-- 占位封面（未播放时） -->
           <image
@@ -37,44 +39,53 @@
             class="video-cover"
           />
 
-          <!-- 右侧互动按钮 -->
-          <view class="side-actions">
-            <view class="action-btn" @click.stop="handleLike(v)">
-              <text class="action-icon" :style="{ color: v._liked ? '#ff4d4f' : '#fff' }">
-                {{ v._liked ? '❤️' : '🤍' }}
-              </text>
-              <text class="action-count">{{ formatCount(v.like_count) }}</text>
-            </view>
-            <view class="action-btn" @click.stop="handleComment(v)">
-              <text class="action-icon">💬</text>
-              <text class="action-count">{{ formatCount(v.comment_count) }}</text>
-            </view>
-            <view class="action-btn" @click.stop="handleFavorite(v)">
-              <text class="action-icon" :style="{ color: v._favored ? '#fadb14' : '#fff' }">
-                {{ v._favored ? '⭐' : '☆' }}
-              </text>
-              <text class="action-count">{{ formatCount(v.collect_count) }}</text>
-            </view>
-            <view class="action-btn" @click.stop="handleShare(v)">
-              <text class="action-icon">↗️</text>
-              <text class="action-count">{{ formatCount(v.share_count) }}</text>
-            </view>
-          </view>
-
           <!-- 底部信息区 -->
           <view class="bottom-bar">
-            <view class="bottom-entity" v-if="entityInfo">
-              <image :src="entityInfo.logo_url || '/static/logo.png'" class="entity-logo" />
-              <text class="entity-name">{{ entityInfo.name }}</text>
-              <view class="follow-pill" :class="{ followed: entityStore.followed }" @click.stop="handleFollow">
-                <text>{{ entityStore.followed ? '已关注' : '+ 关注' }}</text>
-              </view>
+            <!-- 进度条 -->
+            <view class="progress-row">
+              <text class="progress-time">{{ formatDuration(v._currentTime) }}</text>
+              <text class="progress-speed" @click.stop="toggleSpeed(v)">倍数</text>
             </view>
+            <view class="progress-track">
+              <view class="progress-fill" :style="{ width: (v._progress || 0) + '%' }" />
+              <view class="progress-dot" :style="{ left: (v._progress || 0) + '%' }" />
+            </view>
+
             <view class="video-desc">
               <text class="video-title-text">{{ v.title }}</text>
             </view>
             <view class="video-desc" v-if="v.description">
               <text class="video-desc-text">{{ v.description }}</text>
+            </view>
+
+            <view class="bottom-row">
+              <view class="bottom-entity" v-if="entityInfo">
+                <image :src="entityInfo.logo_url || '/static/logo.png'" class="entity-logo" />
+                <text class="entity-name">{{ entityInfo.name }}</text>
+                <view class="follow-pill" :class="{ followed: entityStore.followed }" @click.stop="handleFollow">
+                  <text>{{ entityStore.followed ? '已关注' : '+ 关注' }}</text>
+                </view>
+              </view>
+              <view class="bottom-actions">
+                <view class="action-btn" @click.stop="handleLike(v)">
+                  <text class="action-icon" :style="{ color: v._liked ? '#409EFF' : '#fff' }">👍</text>
+                  <text class="action-count">{{ formatCount(v.like_count) }}</text>
+                </view>
+                <view class="action-btn" @click.stop="handleShare(v)">
+                  <text class="action-icon">↗️</text>
+                  <text class="action-count">{{ formatCount(v.share_count) }}</text>
+                </view>
+                <view class="action-btn" @click.stop="handleFavorite(v)">
+                  <text class="action-icon" :style="{ color: v._favored ? '#ff4d4f' : '#fff' }">
+                    {{ v._favored ? '❤️' : '🤍' }}
+                  </text>
+                  <text class="action-count">{{ formatCount(v.collect_count) }}</text>
+                </view>
+                <view class="action-btn" @click.stop="handleComment(v)">
+                  <text class="action-icon">💬</text>
+                  <text class="action-count">{{ formatCount(v.comment_count) }}</text>
+                </view>
+              </view>
             </view>
           </view>
         </view>
@@ -268,6 +279,33 @@ async function handleFollow() {
   await entityStore.toggleFollow()
 }
 
+// ========== 进度条 ==========
+
+function onLoadedMetadata(v, e) {
+  v._duration = e.detail.duration || 0
+}
+
+function onTimeUpdate(v, e) {
+  v._currentTime = e.detail.currentTime || 0
+  const duration = e.detail.duration || v._duration || 0
+  v._progress = duration ? (v._currentTime / duration) * 100 : 0
+}
+
+function toggleSpeed(v) {
+  const rates = [1, 1.25, 1.5, 2]
+  const idx = rates.indexOf(v._playbackRate || 1)
+  v._playbackRate = rates[(idx + 1) % rates.length]
+  const ctx = uni.createVideoContext('video-' + v.id)
+  ctx?.playbackRate(v._playbackRate)
+}
+
+function formatDuration(sec) {
+  if (!sec) return '00:00'
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
 function handleComment(v) {
   if (!requireLogin()) return
   currentVideo.value = v
@@ -406,23 +444,33 @@ onUnmounted(() => {
 .video-player { width: 100%; height: 100%; }
 .video-cover { width: 100%; height: 100%; }
 
-/* 右侧互动按钮 */
-.side-actions { position: absolute; right: 20rpx; bottom: 280rpx; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 30rpx; }
-.action-btn { display: flex; flex-direction: column; align-items: center; }
-.action-icon { font-size: 48rpx; }
-.action-count { font-size: 22rpx; color: #fff; margin-top: 4rpx; }
-
 /* 底部信息 */
-.bottom-bar { position: absolute; left: 20rpx; right: 120rpx; bottom: 40rpx; z-index: 10; }
-.bottom-entity { display: flex; align-items: center; margin-bottom: 12rpx; }
-.entity-logo { width: 48rpx; height: 48rpx; border-radius: 24rpx; margin-right: 12rpx; }
-.entity-name { font-size: 26rpx; color: #fff; margin-right: 16rpx; }
-.follow-pill { padding: 4rpx 20rpx; border-radius: 24rpx; border: 1rpx solid #fff; }
-.follow-pill text { font-size: 20rpx; color: #fff; }
-.follow-pill.followed { border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.15); }
-.follow-pill.followed text { color: rgba(255,255,255,0.8); }
+.bottom-bar { position: absolute; left: 24rpx; right: 24rpx; bottom: 30rpx; z-index: 10; }
+
+/* 进度条 */
+.progress-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10rpx; }
+.progress-time { font-size: 22rpx; color: #fff; }
+.progress-speed { font-size: 22rpx; color: #fff; }
+.progress-track { position: relative; height: 4rpx; background: rgba(255,255,255,0.3); border-radius: 2rpx; margin-bottom: 16rpx; }
+.progress-fill { position: absolute; left: 0; top: 0; bottom: 0; background: #fff; border-radius: 2rpx; }
+.progress-dot { position: absolute; top: 50%; width: 16rpx; height: 16rpx; margin-left: -8rpx; margin-top: -8rpx; border-radius: 50%; background: #fff; }
+
 .video-title-text { font-size: 28rpx; color: #fff; font-weight: 500; }
 .video-desc-text { font-size: 24rpx; color: rgba(255,255,255,0.8); margin-top: 6rpx; }
+
+/* 底部：主体信息 + 互动按钮 */
+.bottom-row { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 16rpx; }
+.bottom-entity { display: flex; align-items: center; }
+.entity-logo { width: 56rpx; height: 56rpx; border-radius: 28rpx; margin-right: 12rpx; }
+.entity-name { font-size: 26rpx; color: #fff; margin-right: 16rpx; }
+.follow-pill { padding: 4rpx 20rpx; border-radius: 24rpx; background: rgba(255,255,255,0.15); }
+.follow-pill text { font-size: 22rpx; color: #fff; }
+.follow-pill.followed { background: rgba(255,255,255,0.08); }
+.follow-pill.followed text { color: rgba(255,255,255,0.6); }
+.bottom-actions { display: flex; align-items: center; gap: 32rpx; }
+.action-btn { display: flex; flex-direction: column; align-items: center; }
+.action-icon { font-size: 44rpx; }
+.action-count { font-size: 20rpx; color: #fff; margin-top: 4rpx; }
 
 /* 返回 */
 .back-btn { position: absolute; top: 60rpx; left: 20rpx; z-index: 20; width: 60rpx; height: 60rpx; border-radius: 30rpx; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }

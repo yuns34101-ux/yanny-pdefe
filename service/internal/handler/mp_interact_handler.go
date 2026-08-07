@@ -176,7 +176,7 @@ func MpToggleFollow(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	mpAccountID := middleware.GetMpAccountID(c)
 	var req struct {
-		EntityID uint64 `json:"entity_id" binding:"required"`
+		EntityID uint64 `json:"entity_id"` // 0 时兜底为当前小程序账号绑定的默认主体
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, dto.ErrCodeParamInvalid, "参数无效")

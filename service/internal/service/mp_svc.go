@@ -210,7 +210,13 @@ func GetInteractionStatus(mpAccountID, userID, videoID uint64) map[string]bool {
 }
 
 // ToggleFollow 切换关注状态
+// entityID 为 0 时兜底为 mpAccountID 当前绑定的默认主体
 func ToggleFollow(mpAccountID, userID, entityID uint64) (bool, error) {
+	entityID, err := ResolveEntityID(entityID, mpAccountID)
+	if err != nil {
+		return false, err
+	}
+
 	existing, err := repository.FindFollow(mpAccountID, userID, entityID)
 	if err != nil {
 		follow := &model.Follow{
