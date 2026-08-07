@@ -323,7 +323,8 @@ const uploadToQiniu = async (file, fileType) => {
   const uploadRes = await fetch(upload_host, { method: 'POST', body: formData })
   if (!uploadRes.ok) throw new Error('上传失败')
   const result = await uploadRes.json()
-  return `${domain}/${result.key}`
+  const baseUrl = domain.startsWith('http') ? domain : 'https://' + domain
+  return `${baseUrl}/${result.key}`
 }
 
 const handleCoverUpload = async (e) => {

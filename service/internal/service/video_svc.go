@@ -75,13 +75,22 @@ func UpdateVideo(id uint64, updates map[string]interface{}) error {
 	return repository.UpdateVideo(id, updates)
 }
 
+// ensureProtocol 补全缺少的 https:// 前缀
+func ensureProtocol(rawURL string) string {
+	if len(rawURL) > 0 && !(len(rawURL) >= 7 && rawURL[:7] == "http://") &&
+		!(len(rawURL) >= 8 && rawURL[:8] == "https://") {
+		return "https://" + rawURL
+	}
+	return rawURL
+}
+
 // signVideoURLs 给视频的封面和视频 URL 加七牛签名（仅对七牛域名生效）
 func signVideoURLs(v *model.Video) {
 	if v.CoverURL != "" {
-		v.CoverURL = qiniu.GenerateCoverURL(v.CoverURL)
+		v.CoverURL = qiniu.GenerateCoverURL(ensureProtocol(v.CoverURL))
 	}
 	if v.VideoURL != "" {
-		v.VideoURL = qiniu.GenerateVideoURL(v.VideoURL)
+		v.VideoURL = qiniu.GenerateVideoURL(ensureProtocol(v.VideoURL))
 	}
 }
 
