@@ -44,3 +44,4 @@ qiniu:
   region: "z0"
   callback_url: ""
   anti_theft_key: ""  # 时间戳防盗链 key（CDN 域名 → 访问控制 → 时间戳防盗链）
+  media_ttl_hours: 6  # 媒体资源签名有效期（小时），默认 6

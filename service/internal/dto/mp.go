@@ -76,10 +76,12 @@ type CreateVideoRequest struct {
 
 // UpdateVideoRequest 更新视频
 type UpdateVideoRequest struct {
-	Title        string `json:"title" binding:"max=200"`
-	Description  string `json:"description"`
-	CategoryID   uint64 `json:"category_id"`
-	Tags         string `json:"tags"`
-	Status       int8   `json:"status"`
-	IsRecommended int8  `json:"is_recommended"`
+	Title         string `json:"title" binding:"max=200"`
+	Description   string `json:"description"`
+	CoverURL      string `json:"cover_url"`
+	VideoURL      string `json:"video_url"`
+	CategoryID    uint64 `json:"category_id"`
+	Tags          string `json:"tags"`
+	Status        int8   `json:"status"`
+	IsRecommended int8   `json:"is_recommended"`
 }

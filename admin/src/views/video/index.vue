@@ -197,8 +197,9 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { listVideos, createVideo, updateVideo, deleteVideo, listCategories, createCategory, getUploadToken } from '@/api/video'
+import { listVideos, createVideo, updateVideo, deleteVideo, listCategories, createCategory } from '@/api/video'
 import { listEntities } from '@/api/entity'
+import { uploadToQiniu } from '@/utils/upload'
 import { useAuthStore } from '@/store/auth'
 import { ElMessage } from 'element-plus'
 
@@ -305,26 +306,22 @@ const uploadingVideo = ref(false)
 const triggerCoverUpload = () => coverInput.value?.click()
 const triggerVideoUpload = () => videoInput.value?.click()
 
-const uploadToQiniu = async (file, fileType) => {
-  const res = await getUploadToken(fileType)
-  const { token, domain, upload_host } = res.data
-
-  const ext = file.name.split('.').pop()
-  const now = new Date()
-  const ts = now.toISOString().replace(/[-:]/g, '').replace(/\..+/, '')
-  const random = Math.random().toString(36).slice(2, 8)
-  const key = `${fileType}s/${now.toISOString().slice(0, 10).replace(/-/g, '')}/${ts}_${random}.${ext}`
-
-  const formData = new FormData()
-  formData.append('token', token)
-  formData.append('key', key)
-  formData.append('file', file)
-
-  const uploadRes = await fetch(upload_host, { method: 'POST', body: formData })
-  if (!uploadRes.ok) throw new Error('上传失败')
-  const result = await uploadRes.json()
-  const baseUrl = domain.startsWith('http') ? domain : 'https://' + domain
-  return `${baseUrl}/${result.key}`
+// 从视频文件提取时长（秒）
+const extractDuration = (file) => {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(url)
+      resolve(video.duration || 0)
+    }
+    video.onerror = () => {
+      URL.revokeObjectURL(url)
+      resolve(0)
+    }
+    video.src = url
+  })
 }
 
 const handleCoverUpload = async (e) => {
@@ -332,7 +329,7 @@ const handleCoverUpload = async (e) => {
   if (!file) return
   uploadingCover.value = true
   try {
-    form.cover_url = await uploadToQiniu(file, 'image')
+    form.cover_url = await uploadToQiniu(file, 'video_cover')
     ElMessage.success('封面上传成功')
   } catch (err) {
     ElMessage.error('封面上传失败：' + err.message)
@@ -347,8 +344,13 @@ const handleVideoUpload = async (e) => {
   if (!file) return
   uploadingVideo.value = true
   try {
+    // 上传前提取时长
+    const duration = await extractDuration(file)
+    if (duration > 0 && !form.duration) {
+      form.duration = Math.round(duration)
+    }
     form.video_url = await uploadToQiniu(file, 'video')
-    ElMessage.success('视频上传成功')
+    ElMessage.success('视频上传成功，时长 ' + form.duration + ' 秒')
   } catch (err) {
     ElMessage.error('视频上传失败：' + err.message)
   } finally {

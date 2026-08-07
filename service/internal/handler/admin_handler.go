@@ -10,6 +10,7 @@ import (
 	"yanny-service/internal/model"
 	"yanny-service/internal/repository"
 	"yanny-service/internal/service"
+	"yanny-service/internal/util/qiniu"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +24,24 @@ func getEntityScope(c *gin.Context) []uint64 {
 	}
 	ids, _ := repository.GetAdminEntityIDs(adminID)
 	return ids
+}
+
+// signEntityLogoURLs 给实体列表的 logo_url 统一签名
+func signEntityLogoURLs(entities []model.Entity) {
+	for i := range entities {
+		if entities[i].LogoURL != "" {
+			entities[i].LogoURL = qiniu.SignImageURL(entities[i].LogoURL)
+		}
+	}
+}
+
+// signMpIconURLs 给小程序列表的 app_icon 统一签名
+func signMpIconURLs(mps []model.MpAccount) {
+	for i := range mps {
+		if mps[i].AppIcon != "" {
+			mps[i].AppIcon = qiniu.SignImageURL(mps[i].AppIcon)
+		}
+	}
 }
 
 // AdminLogin 管理员登录
@@ -142,6 +161,7 @@ func ListEntities(c *gin.Context) {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())
 		return
 	}
+	signEntityLogoURLs(entities)
 	dto.SuccessPage(c, entities, q.Page, q.PageSize, total)
 }
 
@@ -157,6 +177,7 @@ func GetEntity(c *gin.Context) {
 		dto.Error(c, dto.ErrCodeEntityNotFound, "主体不存在")
 		return
 	}
+	signEntityLogoURLs([]model.Entity{*entity})
 	dto.Success(c, entity)
 }
 
@@ -224,6 +245,7 @@ func ListMpAccounts(c *gin.Context) {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())
 		return
 	}
+	signMpIconURLs(mps)
 	dto.SuccessPage(c, mps, p.Page, p.PageSize, total)
 }
 

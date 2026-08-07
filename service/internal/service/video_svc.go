@@ -2,11 +2,18 @@ package service
 
 import (
 	"errors"
+	"time"
+	"yanny-service/internal/config"
 	"yanny-service/internal/model"
 	"yanny-service/internal/repository"
 	"yanny-service/internal/util/qiniu"
 
 	"gorm.io/gorm"
+)
+
+// 视频处理规则
+const (
+	videoProcessRule = "avthumb/mp4/s/1280x720/vb/2000k/ab/128k/acodec/aac"
 )
 
 // CreateCategory 创建分类
@@ -75,22 +82,15 @@ func UpdateVideo(id uint64, updates map[string]interface{}) error {
 	return repository.UpdateVideo(id, updates)
 }
 
-// ensureProtocol 补全缺少的 https:// 前缀
-func ensureProtocol(rawURL string) string {
-	if len(rawURL) > 0 && !(len(rawURL) >= 7 && rawURL[:7] == "http://") &&
-		!(len(rawURL) >= 8 && rawURL[:8] == "https://") {
-		return "https://" + rawURL
-	}
-	return rawURL
-}
-
-// signVideoURLs 给视频的封面和视频 URL 加七牛签名（仅对七牛域名生效）
+// signVideoURLs 给视频的封面和视频 URL 加七牛签名 + 统一处理规则（admin/mp 共用）
+// 封面 → SignImageURL（与其他图片统一），视频 → SignURL + 转码规则
 func signVideoURLs(v *model.Video) {
 	if v.CoverURL != "" {
-		v.CoverURL = qiniu.GenerateCoverURL(ensureProtocol(v.CoverURL))
+		v.CoverURL = qiniu.SignImageURL(v.CoverURL)
 	}
 	if v.VideoURL != "" {
-		v.VideoURL = qiniu.GenerateVideoURL(ensureProtocol(v.VideoURL))
+		ttl := time.Duration(config.AppConfig.Qiniu.GetMediaTTL()) * time.Hour
+		v.VideoURL = qiniu.SignURL(qiniu.EnsureProtocol(v.VideoURL), videoProcessRule, ttl)
 	}
 }
 

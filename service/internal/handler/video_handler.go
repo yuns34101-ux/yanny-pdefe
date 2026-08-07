@@ -132,6 +132,12 @@ func UpdateVideo(c *gin.Context) {
 	if req.Description != "" {
 		updates["description"] = req.Description
 	}
+	if req.CoverURL != "" {
+		updates["cover_url"] = req.CoverURL
+	}
+	if req.VideoURL != "" {
+		updates["video_url"] = req.VideoURL
+	}
 	if req.CategoryID > 0 {
 		updates["category_id"] = req.CategoryID
 	}

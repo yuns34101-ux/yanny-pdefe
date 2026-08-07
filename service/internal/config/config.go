@@ -86,7 +86,16 @@ type QiniuConfig struct {
 	Domain       string `yaml:"domain"`
 	Region       string `yaml:"region"`
 	CallbackURL  string `yaml:"callback_url"`
-	AntiTheftKey string `yaml:"anti_theft_key"` // 时间戳防盗链 key
+	AntiTheftKey string `yaml:"anti_theft_key"`  // 时间戳防盗链 key
+	MediaTTL     int    `yaml:"media_ttl_hours"` // 媒体资源签名有效期（小时），默认 6
+}
+
+// GetMediaTTL 获取媒体签名有效期
+func (q QiniuConfig) GetMediaTTL() int {
+	if q.MediaTTL <= 0 {
+		return 6
+	}
+	return q.MediaTTL
 }
 
 var AppConfig *Config

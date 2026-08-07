@@ -79,8 +79,14 @@
         <el-form-item label="主体名称" prop="name">
           <el-input v-model="form.name" maxlength="100" />
         </el-form-item>
-        <el-form-item label="Logo URL" prop="logo_url">
-          <el-input v-model="form.logo_url" placeholder="http://..." />
+        <el-form-item label="Logo">
+          <div style="display:flex;gap:8px;align-items:center">
+            <el-input v-model="form.logo_url" placeholder="图片 URL 或点击上传" style="flex:1" />
+            <el-button @click="handleLogoUpload" :loading="uploadingLogo">
+              <el-icon><Upload /></el-icon> 上传
+            </el-button>
+            <el-avatar v-if="form.logo_url" :size="36" :src="form.logo_url" shape="square" />
+          </div>
         </el-form-item>
         <el-form-item label="简介" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" maxlength="500" />
@@ -169,6 +175,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { listEntities, createEntity, updateEntity, deleteEntity, bindEntityMp, unbindEntityMp, listMpAccounts, listEntityBindings } from '@/api/entity'
 import { useAuthStore } from '@/store/auth'
+import { uploadToQiniu } from '@/utils/upload'
 import { ElMessage } from 'element-plus'
 
 const authStore = useAuthStore()
@@ -202,6 +209,28 @@ const submitting = ref(false)
 const formRef = ref(null)
 const form = reactive({ name: '', logo_url: '', description: '', contact_phone: '', contact_email: '', address: '', sort_order: 0, status: 1 })
 const editId = ref(null)
+
+// Logo 上传
+const uploadingLogo = ref(false)
+const handleLogoUpload = async () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.onchange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    uploadingLogo.value = true
+    try {
+      form.logo_url = await uploadToQiniu(file, 'entity_logo')
+      ElMessage.success('Logo 上传成功')
+    } catch (err) {
+      ElMessage.error('上传失败：' + err.message)
+    } finally {
+      uploadingLogo.value = false
+    }
+  }
+  input.click()
+}
 
 const rules = {
   name: [{ required: true, message: '请输入主体名称', trigger: 'blur' }],
