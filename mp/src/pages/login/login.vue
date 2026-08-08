@@ -10,7 +10,7 @@
       />
       <view v-else class="brand-placeholder">
         <text class="brand-emoji">🎬</text>
-        <text class="brand-text">Yanny</text>
+        <text class="brand-text">格物山夏山野民艺</text>
         <text class="brand-slogan">发现精彩短视频</text>
       </view>
     </view>

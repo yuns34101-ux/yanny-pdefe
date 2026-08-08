@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"log"
+
 	"yanny-service/internal/database"
 	"yanny-service/internal/model"
 )
@@ -9,7 +11,7 @@ import (
 
 func ListCategories(entityID, mpAccountID uint64) ([]model.VideoCategory, error) {
 	var categories []model.VideoCategory
-	db := database.DB.Model(&model.VideoCategory{})
+	db := database.DB.Model(&model.VideoCategory{}).Where("status = 1")
 	if entityID > 0 {
 		db = db.Where("entity_id = ?", entityID)
 	}
@@ -102,16 +104,26 @@ func DeleteVideo(id uint64) error {
 	return database.DB.Delete(&model.Video{}, id).Error
 }
 
-// IncrementVideoViewCount 增加视频播放量
+// IncrementVideoViewCount 增加视频播放量（原生 SQL，绕过 GORM 表达式层）
 func IncrementVideoViewCount(videoID uint64) error {
-	return database.DB.Model(&model.Video{}).Where("id = ?", videoID).
-		UpdateColumn("view_count", database.DB.Raw("view_count + 1")).Error
+	err := database.DB.Exec("UPDATE videos SET view_count = view_count + 1 WHERE id = ?", videoID).Error
+	if err != nil {
+		log.Printf("IncrementVideoViewCount 失败: id=%d err=%v", videoID, err)
+	}
+	return err
 }
 
-// UpdateVideoCount 更新视频计数器
+// UpdateVideoCount 更新视频计数器（原生 SQL Exec，绕过 GORM Raw()/clause.Expr 兼容性问题）
+// field 参数来自调用方代码常量，非用户输入，无 SQL 注入风险
 func UpdateVideoCount(videoID uint64, field string, delta int) error {
-	return database.DB.Model(&model.Video{}).Where("id = ?", videoID).
-		UpdateColumn(field, database.DB.Raw(field+" + ?", delta)).Error
+	err := database.DB.Exec(
+		"UPDATE videos SET "+field+" = "+field+" + ? WHERE id = ?",
+		delta, videoID,
+	).Error
+	if err != nil {
+		log.Printf("UpdateVideoCount 失败: id=%d field=%s delta=%d err=%v", videoID, field, delta, err)
+	}
+	return err
 }
 
 // CountVideosByEntity 统计主体下已发布视频数

@@ -25,7 +25,9 @@ export function request(url, options = {}) {
           uni.removeStorageSync('mp_token')
           reject(new Error('请先登录'))
         } else {
-          reject(new Error(data.message || '请求失败'))
+          const err = new Error(data.message || '请求失败')
+          err.code = data.code
+          reject(err)
         }
       },
       fail(err) {

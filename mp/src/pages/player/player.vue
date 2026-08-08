@@ -10,12 +10,13 @@
     >
       <swiper-item v-for="(v, i) in videoList" :key="v.id">
         <view class="video-wrapper">
+          <!-- 只渲染当前这一个 video：切换时旧 video 被 v-if 销毁（自动停），新 video 创建（autoplay 自动播） -->
           <video
-            v-if="Math.abs(i - currentIndex) <= 1 && v.video_url"
+            v-if="i === currentIndex && v.video_url"
             :id="'video-' + v.id"
             :src="v.video_url"
             :poster="v.cover_url"
-            :autoplay="false"
+            :autoplay="true"
             :loop="false"
             :controls="false"
             :show-center-play-btn="false"
@@ -29,8 +30,9 @@
             @timeupdate="onTimeUpdate(v, $event)"
             @loadedmetadata="onLoadedMetadata(v, $event)"
           />
+          <!-- 相邻项只展示封面占位 -->
           <image
-            v-else
+            v-else-if="Math.abs(i - currentIndex) <= 1"
             :src="v.cover_url"
             mode="aspectFill"
             class="video-cover"
@@ -133,7 +135,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import { useVideoStore } from '@/store/video'
 import { useUserStore } from '@/store/user'
@@ -165,7 +167,6 @@ const currentVideo = ref(null)
 const showSpeedPanel = ref(false)
 const speedTarget = ref(null)
 const speedOptions = [0.5, 1, 1.25, 1.5, 2]
-
 const shareTarget = ref(null)
 
 const hasMore = computed(() => videoList.value.length < totalCount.value)
@@ -176,23 +177,39 @@ async function loadVideoDetail(videoId) {
   try {
     const res = await get('/videos/' + videoId)
     return res.data ? { ...res.data, _liked: false, _favored: false } : null
-  } catch (err) { console.error('加载视频详情失败', videoId, err); return null }
+  } catch (err) {
+    if (err.code === 30004) {
+      uni.showToast({ title: '视频已下架', icon: 'none', duration: 2000 })
+    } else {
+      console.error('加载视频详情失败', videoId, err)
+    }
+    return null
+  }
 }
 
+// 补齐 video_url（列表接口不带，需按需拉取）
 async function ensureVideoUrl(v) {
-  if (!v || v.video_url || detailLoading.has(v.id)) return
+  if (!v || v.video_url || v._offline || detailLoading.has(v.id)) return
   detailLoading.add(v.id)
   try {
     const res = await get('/videos/' + v.id)
     if (res.data?.video_url) {
       v.video_url = res.data.video_url
-      // 补齐后若该视频仍是当前播放项，手动触发播放
-      if (v.id === videoList.value[currentIndex.value]?.id) {
-        nextTick(() => { uni.createVideoContext('video-' + v.id).play() })
-      }
     }
-  } catch (err) { console.error('补齐视频地址失败', v.id, err) }
-  finally { detailLoading.delete(v.id) }
+  } catch (err) {
+    if (err.code === 30004) {
+      v._offline = true // 标记下架，不再重试
+      if (v.id === currentVideo.value?.id) {
+        uni.showToast({ title: '视频已下架', icon: 'none', duration: 1500 })
+        // 自动跳到下一个
+        if (currentIndex.value < videoList.value.length - 1) {
+          currentIndex.value++
+        }
+      }
+    } else {
+      console.error('补齐视频地址失败', v.id, err)
+    }
+  } finally { detailLoading.delete(v.id) }
 }
 
 function ensureNearbyVideoUrls(index) {
@@ -249,29 +266,22 @@ function loadEntityInfo(v) {
 
 // ========== 滑动事件 ==========
 
+// 旧 video 由 v-if="i === currentIndex" 销毁自动停播，新 video 创建时 autoplay 自动播
+// 不需要手动 pause/play（WeChat 原生 video 组件对 JS 控制响应不可靠）
 function onSwipeChange(e) {
   const newIndex = e.detail.current
   const oldIndex = currentIndex.value
   currentIndex.value = newIndex
 
-  // 暂停上一个视频
   if (oldIndex !== newIndex && videoList.value[oldIndex]) {
-    const oldVideo = videoList.value[oldIndex]
-    uni.createVideoContext('video-' + oldVideo.id).pause()
-    reportView(oldVideo)
+    reportView(videoList.value[oldIndex])
   }
 
-  // 播放当前视频：nextTick 等 v-if 重新渲染出 video 元素后再 play
   const newVideo = videoList.value[newIndex]
   if (newVideo) {
     currentVideo.value = newVideo
     loadInteractionStatus(newVideo.id)
     loadEntityInfo(newVideo)
-    nextTick(() => {
-      if (newVideo.video_url) {
-        uni.createVideoContext('video-' + newVideo.id).play()
-      }
-    })
   }
 
   ensureNearbyVideoUrls(newIndex)
@@ -403,7 +413,6 @@ onLoad(async (query) => {
     if (detail) {
       videoList.value = [detail]; currentIndex.value = 0; currentVideo.value = detail
       loadInteractionStatus(detail.id); loadEntityInfo(detail)
-      if (detail.video_url) { nextTick(() => { uni.createVideoContext('video-' + detail.id).play() }) }
     }
     loadVideos(1).then(() => {
       if (!detail && videoList.value.length) {

@@ -134,7 +134,7 @@ export const useUserStore = defineStore('user', () => {
     return 'wxff0ecb7fddca4ecc'
     // #endif
     // #ifdef H5
-    return 'h5-yanny'
+    return 'h5-格物山夏山野民艺'
     // #endif
     return ''
   }

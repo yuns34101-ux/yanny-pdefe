@@ -5,7 +5,7 @@
       <view class="entity-header">
         <image class="entity-logo" :src="entity?.logo_url || '/static/logo.png'" mode="aspectFill" />
         <view class="entity-basic">
-          <text class="entity-name">{{ entity?.name || '格物山夏山野民艺' }}</text>
+          <text class="entity-name">{{ entity?.name || '扬昵 Yanny' }}</text>
         </view>
       </view>
       <text class="entity-desc" v-if="entity?.description">{{ entity.description }}</text>
@@ -24,10 +24,8 @@
       </view>
     </view>
 
-    <!-- 视频区块标题 -->
     <view class="section-title">视频</view>
 
-    <!-- 分类标签 -->
     <view class="category-row">
       <view
         v-for="c in allCategory"
@@ -42,7 +40,6 @@
       </view>
     </view>
 
-    <!-- 视频三列流 -->
     <view class="video-grid" v-if="videos.length">
       <view
         v-for="v in videos"
@@ -58,7 +55,6 @@
       </view>
     </view>
 
-    <!-- 加载更多 -->
     <view class="load-more" v-if="loading">
       <text>加载中...</text>
     </view>
@@ -66,12 +62,9 @@
       <text>加载更多</text>
     </view>
 
-    <!-- 空状态 -->
     <view class="empty" v-if="!loading && !videos.length">
       <text>暂无视频</text>
     </view>
-
-    <ProfileSetupModal />
   </view>
 </template>
 
@@ -81,7 +74,6 @@ import { onReachBottom, onShow, onShareAppMessage } from '@dcloudio/uni-app'
 import { useVideoStore } from '@/store/video'
 import { useUserStore } from '@/store/user'
 import { useEntityStore } from '@/store/entity'
-import ProfileSetupModal from '@/components/ProfileSetupModal.vue'
 
 const videoStore = useVideoStore()
 const userStore = useUserStore()
@@ -95,7 +87,7 @@ const loading = computed(() => videoStore.loading)
 const hasMore = computed(() => videoStore.hasMore)
 
 const allCategory = computed(() => [
-  { id: 0, name: '全部' },
+  { id: 0, name: '精选' },
   ...videoStore.categories,
 ])
 
@@ -151,7 +143,6 @@ function formatCount(n) {
   return String(n)
 }
 
-// 上拉触底
 onReachBottom(() => {
   if (hasMore.value) loadMore()
 })
@@ -161,19 +152,17 @@ let mounted = false
 onMounted(async () => {
   await userStore.waitForReady()
   await entityStore.fetchEntityInfo()
-  // uni.setNavigationBarTitle({ title: entityStore.entity?.name || '扬昵 Yanny' })
   videoStore.fetchVideos(activeCategory.value)
   videoStore.fetchCategories(1, 1)
   mounted = true
 })
 
-// 从播放页返回时静默刷新视频列表，同步点赞/收藏/分享/评论等计数
+// 从播放页返回时强制刷新（refreshVideos 会先重置 loading 再拉取，不被防重入锁拦截）
 onShow(() => {
   if (!mounted) return
-  videoStore.fetchVideos(activeCategory.value)
+  videoStore.refreshVideos(activeCategory.value)
 })
 
-// 首页分享：卡片用主体信息（logo + 名称），带入邀请人 ID 实现分享裂变
 onShareAppMessage(() => ({
   title: entity.value?.name || '格物山夏山野民艺',
   imageUrl: entity.value?.logo_url || '',
@@ -183,8 +172,6 @@ onShareAppMessage(() => ({
 
 <style scoped>
 .home { padding-bottom: 20rpx; background: #fff; min-height: 100vh; }
-
-/* 主体介绍卡片 */
 .entity-card { padding: 24rpx; }
 .entity-header { display: flex; align-items: center; }
 .entity-logo { width: 96rpx; height: 96rpx; border-radius: 50%; flex-shrink: 0; }

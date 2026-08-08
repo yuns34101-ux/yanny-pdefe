@@ -11,7 +11,6 @@ import (
 
 // ========== 分类管理 ==========
 
-// CreateCategory 创建分类
 func CreateCategory(c *gin.Context) {
 	var req struct {
 		EntityID    uint64 `json:"entity_id" binding:"required"`
@@ -33,7 +32,6 @@ func CreateCategory(c *gin.Context) {
 	dto.Success(c, cat)
 }
 
-// ListCategories 分类列表
 func ListCategories(c *gin.Context) {
 	entityID, _ := parseUintQuery(c, "entity_id")
 	mpAccountID, _ := parseUintQuery(c, "mp_account_id")
@@ -45,12 +43,17 @@ func ListCategories(c *gin.Context) {
 	dto.Success(c, categories)
 }
 
-// MpListCategories 小程序端分类列表（公开，无需管理员鉴权）
+// MpListCategories 小程序端分类列表（entityID=0 时解析默认主体）
 func MpListCategories(c *gin.Context) {
 	entityID, _ := parseUintQuery(c, "entity_id")
 	mpAccountID := c.GetUint64("mp_account_id")
 	if mpAccountID == 0 {
 		mpAccountID, _ = parseUintQuery(c, "mp_account_id")
+	}
+	if entityID == 0 {
+		if resolved, err := service.ResolveEntityID(0, mpAccountID); err == nil {
+			entityID = resolved
+		}
 	}
 	categories, err := repository.ListCategories(entityID, mpAccountID)
 	if err != nil {
@@ -62,7 +65,6 @@ func MpListCategories(c *gin.Context) {
 
 // ========== 视频管理（管理后台） ==========
 
-// CreateVideo 创建视频
 func CreateVideo(c *gin.Context) {
 	var req dto.CreateVideoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -107,7 +109,6 @@ func CreateVideo(c *gin.Context) {
 	dto.Success(c, video)
 }
 
-// ListVideos 视频列表（管理后台）
 func ListVideos(c *gin.Context) {
 	var q struct {
 		dto.Pagination
@@ -129,7 +130,6 @@ func ListVideos(c *gin.Context) {
 	dto.SuccessPage(c, videos, q.Page, q.PageSize, total)
 }
 
-// UpdateVideo 更新视频
 func UpdateVideo(c *gin.Context) {
 	id, ok := parseUintParam(c, "id")
 	if !ok {
@@ -172,7 +172,6 @@ func UpdateVideo(c *gin.Context) {
 	dto.Success(c, nil)
 }
 
-// DeleteVideo 删除视频
 func DeleteVideo(c *gin.Context) {
 	id, ok := parseUintParam(c, "id")
 	if !ok {
@@ -188,23 +187,28 @@ func DeleteVideo(c *gin.Context) {
 
 // ========== 小程序端视频接口 ==========
 
-// MpGetVideos 小程序端视频列表
+// MpGetVideos 小程序端视频列表（entityID=0 时解析当前小程序默认主体）
 func MpGetVideos(c *gin.Context) {
 	var q dto.VideoListQuery
 	if err := c.ShouldBindQuery(&q); err != nil {
 		q.Page, q.PageSize = 1, 20
 	}
 	mpAccountID := c.GetUint64("mp_account_id")
-	// 游客模式：从 Query 参数获取 mp_account_id
 	if mpAccountID == 0 {
 		mpAccountID, _ = parseUintQuery(c, "mp_account_id")
 	}
 	if mpAccountID == 0 {
-		mpAccountID = 1 // 默认小程序
+		mpAccountID = 1
 	}
 	entityID := q.EntityID
 	if entityID == 0 {
 		entityID, _ = parseUintQuery(c, "entity_id")
+	}
+	// entityID 为 0 时解析默认主体，避免列出其他主体的视频
+	if entityID == 0 {
+		if resolved, err := service.ResolveEntityID(0, mpAccountID); err == nil {
+			entityID = resolved
+		}
 	}
 	videos, total, err := service.GetVideosForMp(mpAccountID, entityID, q.CategoryID, q.Page, q.PageSize)
 	if err != nil {
@@ -226,6 +230,9 @@ func MpGetVideoDetail(c *gin.Context) {
 		dto.Error(c, dto.ErrCodeVideoNotFound, "视频不存在")
 		return
 	}
+	if video.Status != 1 {
+		dto.Error(c, dto.ErrCodeVideoOffline, "视频已下架")
+		return
+	}
 	dto.Success(c, video)
 }
-

@@ -38,6 +38,12 @@ export const useVideoStore = defineStore('video', () => {
     }
   }
 
+  // 强制刷新列表（绕过 loading 防重入锁，供 onShow 使用）
+  async function refreshVideos(categoryId = 0, entityId = 0) {
+    loading.value = false
+    await fetchVideos(categoryId, entityId, 1)
+  }
+
   // 加载下一页（播放器预加载用）
   async function fetchNextPage() {
     if (!hasMore.value || loading.value) return
@@ -99,7 +105,7 @@ export const useVideoStore = defineStore('video', () => {
 
   return {
     videos, categories, currentPage, totalCount, pageSize, loading, hasMore,
-    fetchVideos, fetchNextPage, fetchCategories,
+    fetchVideos, refreshVideos, fetchNextPage, fetchCategories,
     toggleLike, toggleFavorite, recordShare, getInteractionStatus, toggleFollow,
     fetchComments, postComment,
   }

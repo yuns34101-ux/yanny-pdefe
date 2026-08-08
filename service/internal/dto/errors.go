@@ -20,6 +20,7 @@ const (
 	ErrCodeVideoNotFound     = 30001
 	ErrCodeCategoryNotFound  = 30002
 	ErrCodeCommentNotFound   = 30003
+	ErrCodeVideoOffline      = 30004
 
 	// 用户/管理后台 40001-49999
 	ErrCodeUserNotFound     = 40001
@@ -46,6 +47,7 @@ var errMessages = map[int]string{
 	ErrCodeEntityNotFound:     "主体不存在",
 	ErrCodeMpAccountNotFound:  "小程序账号不存在",
 	ErrCodeVideoNotFound:      "视频不存在",
+	ErrCodeVideoOffline:       "视频已下架",
 	ErrCodeCategoryNotFound:   "分类不存在",
 	ErrCodeCommentNotFound:    "评论不存在",
 	ErrCodeUserNotFound:       "用户不存在",

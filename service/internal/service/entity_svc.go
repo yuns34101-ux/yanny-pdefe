@@ -116,7 +116,6 @@ type EntityWithStats struct {
 }
 
 // ResolveEntityID 解析主体 ID：entityID 优先使用；为 0 时通过 mpAccountID 反查默认绑定的主体
-// 小程序账号与主体目前是 1 对 1 关系，客户端提交 entity_id=0 时兜底为当前绑定主体，避免"主体不存在"异常
 func ResolveEntityID(entityID, mpAccountID uint64) (uint64, error) {
 	if entityID > 0 {
 		return entityID, nil
@@ -151,6 +150,10 @@ func GetEntityForMp(entityID, mpAccountID, userID uint64) (*EntityWithStats, err
 	entity, err := repository.FindEntityByID(entityID)
 	if err != nil {
 		return nil, err
+	}
+	// 停用的主体不对外展示
+	if entity.Status != 1 {
+		return nil, errors.New("主体不存在")
 	}
 	if entity.LogoURL != "" {
 		entity.LogoURL = qiniu.SignImageURL(entity.LogoURL)
