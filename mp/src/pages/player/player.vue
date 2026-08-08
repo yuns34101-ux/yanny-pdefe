@@ -202,11 +202,8 @@ const speedOptions = [0.5, 1, 1.25, 1.5, 2]
 const shareTarget = ref(null)
 
 // ========== 视频加载 + 分页预加载 ==========
-// 列表接口（/videos）不再返回 video_url（仅封面），播放地址由 /videos/:id 详情接口按需懒加载。
-// 这样列表页/滑动导航保持轻量，同时保证分享链接进来时能直接定位到目标视频，不受它是否在第一页影响。
-
 const hasMore = computed(() => videoList.value.length < totalCount.value)
-const pinnedVideoId = ref(null) // 分享/直达进入时优先展示的视频 ID，与列表合并时置于队首并去重
+const pinnedVideoId = ref(null) // 分享/直达进入时优先展示的视频 ID
 const detailLoading = new Set() // 正在拉取详情的视频 ID，避免重复请求
 
 // 拉取单个视频详情（含签名后的 video_url）
@@ -220,7 +217,7 @@ async function loadVideoDetail(videoId) {
   }
 }
 
-// 按需为当前及相邻视频补齐 video_url（懒加载，避免列表接口带全量视频地址）
+// 按需为当前及相邻视频补齐 video_url
 async function ensureVideoUrl(v) {
   if (!v || v.video_url || detailLoading.has(v.id)) return
   detailLoading.add(v.id)
@@ -228,6 +225,10 @@ async function ensureVideoUrl(v) {
     const res = await get(`/videos/${v.id}`)
     if (res.data?.video_url) {
       v.video_url = res.data.video_url
+      // video_url 补齐后，若该视频正是当前播放项，触发播放
+      if (v.id === currentVideo.value?.id) {
+        uni.createVideoContext('video-' + v.id).play()
+      }
     }
   } catch (err) {
     console.error('补齐视频地址失败', v.id, err)
@@ -270,7 +271,7 @@ async function loadVideos(pageNum = 1) {
   }
 }
 
-// 预加载下一页（滑动到阈值时触发）
+// 预加载下一页
 async function preloadNextPage() {
   const needPreload = currentIndex.value >= videoList.value.length - PRELOAD_THRESHOLD
   if (needPreload && hasMore.value && !loadingMore.value) {
@@ -292,7 +293,7 @@ async function loadInteractionStatus(videoId) {
   } catch { /* ignore */ }
 }
 
-// 加载当前视频所属主体信息（logo/名称/关注状态）
+// 加载当前视频所属主体信息
 function loadEntityInfo(v) {
   if (!v?.entity_id) return
   if (entityStore.entity?.id === v.entity_id) return
@@ -306,17 +307,24 @@ function onSwipeChange(e) {
   const oldIndex = currentIndex.value
   currentIndex.value = newIndex
 
-  // 上报上一个视频的观看数据
+  // 暂停上一个视频并上报观看数据
   if (oldIndex !== newIndex && videoList.value[oldIndex]) {
-    reportView(videoList.value[oldIndex])
+    const oldVideo = videoList.value[oldIndex]
+    const oldCtx = uni.createVideoContext('video-' + oldVideo.id)
+    oldCtx.pause()
+    reportView(oldVideo)
   }
 
-  // 加载新视频互动状态
+  // 加载新视频互动状态 + 显式播放（autoplay 仅首次渲染时生效，切换时需手动触发）
   const newVideo = videoList.value[newIndex]
   if (newVideo) {
     currentVideo.value = newVideo
     loadInteractionStatus(newVideo.id)
     loadEntityInfo(newVideo)
+    // video_url 已就绪时直接播放，否则等 ensureVideoUrl 补齐后播放
+    if (newVideo.video_url) {
+      uni.createVideoContext('video-' + newVideo.id).play()
+    }
   }
 
   // 按需补齐当前及相邻视频的播放地址 + 预加载下一页列表
@@ -398,12 +406,12 @@ function handleComment(v) {
   loadComments(v.id)
 }
 
-// 点击分享按钮时记录待分享视频，实际分享卡片由 onShareAppMessage 生成
+// 点击分享按钮时记录待分享视频
 function prepareShare(v) {
   shareTarget.value = v
 }
 
-// 微信小程序标准"分享给好友"钩子：卡片用视频封面+标题，路径带入当前用户 ID 实现分享裂变邀请
+// 分享卡片：使用视频标题 + 视频封面，路径带入当前用户 ID 实现分享裂变
 onShareAppMessage(() => {
   const v = shareTarget.value
   if (!v) return {}
@@ -505,7 +513,7 @@ function goBack() {
 // ========== 生命周期 ==========
 
 onLoad(async (query) => {
-  // 分享裂变：若通过分享链接直接冷启动进入播放页，此处兜底捕获邀请人（App.vue onLaunch 是主路径）
+  // 分享裂变：若通过分享链接直接冷启动进入播放页，此处兜底捕获邀请人
   if (query.inviter && !uni.getStorageSync('mp_token')) {
     uni.setStorageSync('pending_inviter', query.inviter)
   }
@@ -513,7 +521,7 @@ onLoad(async (query) => {
   const videoId = query.videoId ? parseInt(query.videoId) : null
 
   if (videoId) {
-    // 分享/直达场景：优先单独拉取目标视频详情并立即展示，不依赖它是否在列表第一页里
+    // 分享/直达场景：优先单独拉取目标视频详情并立即展示
     pinnedVideoId.value = videoId
     const detail = await loadVideoDetail(videoId)
     if (detail) {
@@ -521,11 +529,10 @@ onLoad(async (query) => {
       currentIndex.value = 0
       currentVideo.value = detail
       loadInteractionStatus(detail.id)
-      loadEntityInfo(detail) // 分享进来需要刷新对应主体信息
+      loadEntityInfo(detail)
     }
-    // 后台并行拉取列表用于滑动导航，加载完成后与已展示的视频去重合并
+    // 后台并行拉取列表用于滑动导航
     loadVideos(1).then(() => {
-      // 目标视频详情获取失败（如已下架）时兜底展示列表第一个
       if (!detail && videoList.value.length) {
         currentVideo.value = videoList.value[0]
         loadInteractionStatus(currentVideo.value.id)
@@ -534,7 +541,7 @@ onLoad(async (query) => {
       ensureNearbyVideoUrls(currentIndex.value)
     })
   } else {
-    // 首页跳转场景：沿用原有列表优先逻辑
+    // 首页跳转场景：列表优先
     await loadVideos(1)
     if (videoList.value.length) {
       currentVideo.value = videoList.value[0]

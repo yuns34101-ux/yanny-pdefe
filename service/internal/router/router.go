@@ -116,17 +116,17 @@ func SetupRouter() *gin.Engine {
 		}
 
 		// 数据统计
-			stats := admin.Group("/stats")
-			stats.Use(middleware.AdminAuthMiddleware())
-			{
-				stats.GET("/dashboard", middleware.RequirePermission("analytics:view"), handler.GetDashboardStats)
-				stats.GET("/trend", middleware.RequirePermission("analytics:view"), handler.GetTrendData)
-				stats.GET("/top-videos", middleware.RequirePermission("analytics:view"), handler.GetTopVideos)
-				stats.GET("/regions", middleware.RequirePermission("analytics:view"), handler.GetRegionStats)
-				stats.GET("/invites", middleware.RequirePermission("analytics:view"), handler.GetInviteStats)
-			}
+		stats := admin.Group("/stats")
+		stats.Use(middleware.AdminAuthMiddleware())
+		{
+			stats.GET("/dashboard", middleware.RequirePermission("analytics:view"), handler.GetDashboardStats)
+			stats.GET("/trend", middleware.RequirePermission("analytics:view"), handler.GetTrendData)
+			stats.GET("/top-videos", middleware.RequirePermission("analytics:view"), handler.GetTopVideos)
+			stats.GET("/regions", middleware.RequirePermission("analytics:view"), handler.GetRegionStats)
+			stats.GET("/invites", middleware.RequirePermission("analytics:view"), handler.GetInviteStats)
+		}
 
-			roles := admin.Group("/roles")
+		roles := admin.Group("/roles")
 		roles.Use(middleware.AdminAuthMiddleware())
 		{
 			roles.GET("", middleware.RequirePermission("role:view"), handler.ListRoles)
@@ -143,7 +143,7 @@ func SetupRouter() *gin.Engine {
 	{
 		mpApi.POST("/login", middleware.MpAPILimiter(), handler.MpLogin)
 
-		// 主体信息（需登录：进入小程序即静默登录，登录后所有接口均需 token）
+		// 主体信息（需登录）
 		mpApi.GET("/entity", middleware.MpAuthRequired(), handler.MpGetEntity)
 
 		// 分类（需登录）
@@ -177,6 +177,7 @@ func SetupRouter() *gin.Engine {
 			mpAuth.POST("/share", handler.MpRecordShare)
 			mpAuth.GET("/interaction-status", handler.MpInteractionStatus)
 			mpAuth.POST("/follow", handler.MpToggleFollow)
+			mpAuth.GET("/user/me", handler.MpGetUserInfo)
 			mpAuth.POST("/user/phone", handler.MpUpdatePhone)
 			mpAuth.PUT("/user/info", handler.MpUpdateUserInfo)
 			mpAuth.POST("/upload/token", handler.MpGetUploadToken)

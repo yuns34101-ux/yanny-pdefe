@@ -1,6 +1,7 @@
 <script setup>
 import { onLaunch } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
+import { get } from '@/utils/request'
 
 // 接收分享裂变的邀请人参数（微信小程序 onLaunch 的 query 里带 scene/path 参数）
 function capturePendingInviter(options) {
@@ -22,6 +23,18 @@ async function loginWithRetry(userStore) {
   }
 }
 
+// 从服务端拉取当前用户完整信息（昵称/头像/手机号），解决 token 存在但 userInfo 丢失的问题
+async function restoreUserInfo(userStore) {
+  try {
+    const res = await get('/user/me')
+    if (res.data) {
+      userStore.userInfo = res.data
+    }
+  } catch {
+    // 静默失败，login 时 doLogin 会兜底设置
+  }
+}
+
 onLaunch(async (options) => {
   const userStore = useUserStore()
   capturePendingInviter(options)
@@ -33,11 +46,8 @@ onLaunch(async (options) => {
   } else {
     userStore.token = token
     userStore.ready = true
-    // 从 storage 恢复用户信息，避免重启后 userInfo 为空导致"我的"页显示未绑定
-    const cached = uni.getStorageSync('mp_user_info')
-    if (cached) {
-      try { userStore.userInfo = JSON.parse(cached) } catch { /* ignore */ }
-    }
+    // 通过 API 拉取用户信息，填补重启后 userInfo 为空的缺口
+    restoreUserInfo(userStore)
   }
 })
 </script>

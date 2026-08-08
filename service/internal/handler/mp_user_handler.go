@@ -60,6 +60,23 @@ func MpUpdateUserInfo(c *gin.Context) {
 	dto.Success(c, gin.H{"nickname": req.Nickname, "avatar_url": req.AvatarURL})
 }
 
+// MpGetUserInfo 获取当前登录用户信息（token 存在但内存中 userInfo 丢失时恢复用）
+func MpGetUserInfo(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	user, err := repository.FindUserByID(userID)
+	if err != nil {
+		dto.Error(c, dto.ErrCodeUserNotFound, "用户不存在")
+		return
+	}
+	dto.Success(c, dto.MpUserInfoResponse{
+		UserID:    user.ID,
+		Nickname:  user.Nickname,
+		AvatarURL: user.AvatarURL,
+		Phone:     user.Phone,
+		Gender:    user.Gender,
+	})
+}
+
 // MpGetUploadToken 获取七牛上传 Token（小程序端，仅图片，用于头像直传）
 func MpGetUploadToken(c *gin.Context) {
 	result, err := buildQiniuUploadToken()

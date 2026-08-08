@@ -76,8 +76,8 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { listMpAccounts } from '@/api/entity'
-import { ElMessage } from 'element-plus'
+import { listMpAccounts, listUsers, updateUserStatus } from '@/api/entity'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 // 小程序列表（供筛选）
 const mpList = ref([])
@@ -86,16 +86,36 @@ const total = ref(0)
 const query = reactive({ mp_account_id: null, phone: '', page: 1, page_size: 20 })
 
 const fetchList = async () => {
-  // TODO: 对接用户列表接口
-  ElMessage.info('用户列表接口待后端实现')
+  try {
+    const params = { page: query.page, page_size: query.page_size }
+    if (query.mp_account_id) params.mp_account_id = query.mp_account_id
+    if (query.phone) params.phone = query.phone
+    const res = await listUsers(params)
+    list.value = res.data || []
+    total.value = res.meta?.total || 0
+  } catch (err) {
+    ElMessage.error('加载用户列表失败')
+  }
 }
 
-const toggleStatus = (row) => {
-  ElMessage.info('用户状态切换接口待后端实现')
+const toggleStatus = async (row) => {
+  const newStatus = row.status === 1 ? 0 : 1
+  const action = newStatus === 0 ? '禁用' : '启用'
+  try {
+    await ElMessageBox.confirm(`确认${action}该用户？`, '提示', { type: 'warning' })
+  } catch { return }
+  try {
+    await updateUserStatus(row.id, newStatus)
+    row.status = newStatus
+    ElMessage.success(`${action}成功`)
+  } catch (err) {
+    ElMessage.error(`${action}失败`)
+  }
 }
 
 onMounted(async () => {
   try { const res = await listMpAccounts({ page: 1, page_size: 100 }); mpList.value = res.data || [] } catch { }
+  fetchList()
 })
 </script>
 
