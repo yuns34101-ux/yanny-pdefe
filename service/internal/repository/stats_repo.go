@@ -84,6 +84,32 @@ func GetRegionStats(entityIDs []uint64, days int) ([]RegionStat, error) {
 	return regions, err
 }
 
+// InviteStat 邀请人裂变统计
+type InviteStat struct {
+	InviterUserID uint64 `json:"inviter_user_id"`
+	InviteCount   int64  `json:"invite_count"`
+}
+
+// GetInviteStats 分享裂变统计：按邀请人分组统计邀请到的新用户数（Top N）
+func GetInviteStats(limit int) ([]InviteStat, int64, error) {
+	var stats []InviteStat
+	err := database.DB.Table("users").
+		Select("inviter_user_id, COUNT(1) as invite_count").
+		Where("inviter_user_id IS NOT NULL").
+		Group("inviter_user_id").
+		Order("invite_count DESC").
+		Limit(limit).
+		Scan(&stats).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var totalInvitedUsers int64
+	database.DB.Table("users").Where("inviter_user_id IS NOT NULL").Count(&totalInvitedUsers)
+
+	return stats, totalInvitedUsers, nil
+}
+
 // GetTodaySummary 今日汇总（指标卡）
 func GetTodaySummary(entityIDs []uint64) map[string]int64 {
 	today := time.Now().Format("2006-01-02")

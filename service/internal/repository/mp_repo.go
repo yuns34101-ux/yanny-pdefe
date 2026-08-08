@@ -92,17 +92,6 @@ func UpdateFavoriteStatus(id uint64, status int8) error {
 		Updates(map[string]interface{}{"status": status}).Error
 }
 
-func ListFavoritesByUser(mpAccountID, userID uint64, page, pageSize int) ([]model.Favorite, int64, error) {
-	var favs []model.Favorite
-	var total int64
-	db := database.DB.Model(&model.Favorite{}).
-		Where("mp_account_id = ? AND user_id = ? AND status = 1", mpAccountID, userID)
-	db.Count(&total)
-	err := db.Order("created_at DESC").
-		Offset((page - 1) * pageSize).Limit(pageSize).Find(&favs).Error
-	return favs, total, err
-}
-
 // ========== 分享 ==========
 
 func CreateShare(share *model.Share) error {

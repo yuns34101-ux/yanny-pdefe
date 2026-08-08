@@ -2,21 +2,37 @@
 import { onLaunch } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 
-onLaunch(async () => {
-  console.log('Yanny 启动')
-  const userStore = useUserStore()
+// 接收分享裂变的邀请人参数（微信小程序 onLaunch 的 query 里带 scene/path 参数）
+function capturePendingInviter(options) {
+  const inviter = options?.query?.inviter
+  if (inviter) uni.setStorageSync('pending_inviter', inviter)
+}
 
-  // 进场即静默登录 —— 获取 Token 用于后续埋点链路
+async function loginWithRetry(userStore) {
+  try {
+    await userStore.silentLogin()
+  } catch (e) {
+    uni.showModal({
+      title: '登录失败',
+      content: '进入小程序需要先登录，请重试',
+      showCancel: false,
+      confirmText: '重试',
+      success: () => loginWithRetry(userStore),
+    })
+  }
+}
+
+onLaunch(async (options) => {
+  const userStore = useUserStore()
+  capturePendingInviter(options)
+
+  // 进场即静默登录 —— 登录后所有接口才可访问，登录失败强制重试，不允许降级浏览
   const token = uni.getStorageSync('mp_token')
   if (!token) {
-    try {
-      await userStore.silentLogin()
-      console.log('静默登录成功')
-    } catch (e) {
-      console.log('静默登录失败，稍后重试', e.message)
-    }
+    await loginWithRetry(userStore)
   } else {
     userStore.token = token
+    userStore.ready = true
   }
 })
 </script>

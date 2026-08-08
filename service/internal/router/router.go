@@ -123,6 +123,7 @@ func SetupRouter() *gin.Engine {
 				stats.GET("/trend", middleware.RequirePermission("analytics:view"), handler.GetTrendData)
 				stats.GET("/top-videos", middleware.RequirePermission("analytics:view"), handler.GetTopVideos)
 				stats.GET("/regions", middleware.RequirePermission("analytics:view"), handler.GetRegionStats)
+				stats.GET("/invites", middleware.RequirePermission("analytics:view"), handler.GetInviteStats)
 			}
 
 			roles := admin.Group("/roles")
@@ -142,27 +143,27 @@ func SetupRouter() *gin.Engine {
 	{
 		mpApi.POST("/login", middleware.MpAPILimiter(), handler.MpLogin)
 
-		// 主体信息（游客可看）
-		mpApi.GET("/entity", middleware.MpAuthOptional(), handler.MpGetEntity)
+		// 主体信息（需登录：进入小程序即静默登录，登录后所有接口均需 token）
+		mpApi.GET("/entity", middleware.MpAuthRequired(), handler.MpGetEntity)
 
-		// 分类（游客可看）
-		mpApi.GET("/categories", middleware.MpAuthOptional(), handler.MpListCategories)
+		// 分类（需登录）
+		mpApi.GET("/categories", middleware.MpAuthRequired(), handler.MpListCategories)
 
-		// 视频（游客可浏览，去重+防刷）
+		// 视频（需登录，去重+防刷）
 		mpVideos := mpApi.Group("/videos")
-		mpVideos.Use(middleware.MpAuthOptional(), middleware.MpAPILimiter(), middleware.VideoViewAntiAbuse())
+		mpVideos.Use(middleware.MpAuthRequired(), middleware.MpAPILimiter(), middleware.VideoViewAntiAbuse())
 		{
 			mpVideos.GET("", handler.MpGetVideos)
 			mpVideos.GET("/:id", handler.MpGetVideoDetail)
 		}
 
-		// 评论（游客可查看，发评论需登录）
+		// 评论（需登录）
 		mpComments := mpApi.Group("/comments")
-		mpComments.Use(middleware.MpAuthOptional())
+		mpComments.Use(middleware.MpAuthRequired())
 		{
 			mpComments.GET("", handler.MpListComments)
 			mpComments.GET("/:id/replies", handler.MpListReplies)
-			mpComments.POST("", middleware.MpAuthRequired(), handler.MpCreateComment)
+			mpComments.POST("", handler.MpCreateComment)
 		}
 
 		// 互动（全部需登录）
@@ -172,14 +173,15 @@ func SetupRouter() *gin.Engine {
 			mpAuth.POST("/like", handler.MpToggleLike)
 			mpAuth.POST("/favorite", handler.MpToggleFavorite)
 			mpAuth.GET("/favorites", handler.MpMyFavorites)
+			mpAuth.GET("/history", handler.MpMyHistory)
 			mpAuth.POST("/share", handler.MpRecordShare)
 			mpAuth.GET("/interaction-status", handler.MpInteractionStatus)
 			mpAuth.POST("/follow", handler.MpToggleFollow)
 		}
 
-		// 埋点上报（签名校验 + 限流）
+		// 埋点上报（需登录 + 签名校验 + 限流）
 		mpTrack := mpApi.Group("/track")
-		mpTrack.Use(middleware.MpAuthOptional(), middleware.MpAPILimiter())
+		mpTrack.Use(middleware.MpAuthRequired(), middleware.MpAPILimiter())
 		{
 			mpTrack.POST("/view", handler.MpReportView)
 			mpTrack.POST("/action", handler.MpReportAction)

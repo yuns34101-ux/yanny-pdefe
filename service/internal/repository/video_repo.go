@@ -121,3 +121,32 @@ func CountVideosByEntity(entityID uint64) (int64, error) {
 		Where("entity_id = ? AND status = 1", entityID).Count(&count).Error
 	return count, err
 }
+
+// ListFavoriteVideosByUser 我的收藏视频列表（关联 favorites 表，按收藏时间倒序）
+func ListFavoriteVideosByUser(mpAccountID, userID uint64, page, pageSize int) ([]model.Video, int64, error) {
+	var videos []model.Video
+	var total int64
+	db := database.DB.Model(&model.Video{}).
+		Joins("JOIN favorites ON favorites.video_id = videos.id").
+		Where("favorites.mp_account_id = ? AND favorites.user_id = ? AND favorites.status = 1", mpAccountID, userID)
+	db.Count(&total)
+	err := db.Order("favorites.created_at DESC").
+		Offset((page - 1) * pageSize).Limit(pageSize).Find(&videos).Error
+	return videos, total, err
+}
+
+// ListHistoryVideosByUser 观看历史视频列表（关联 view_logs 表，按视频去重取最近一次播放时间倒序）
+func ListHistoryVideosByUser(mpAccountID, userID uint64, page, pageSize int) ([]model.Video, int64, error) {
+	var videos []model.Video
+	var total int64
+	latest := database.DB.Table("view_logs").
+		Select("video_id, MAX(created_at) as last_watched_at").
+		Where("mp_account_id = ? AND user_id = ?", mpAccountID, userID).
+		Group("video_id")
+	db := database.DB.Model(&model.Video{}).
+		Joins("JOIN (?) AS vl ON vl.video_id = videos.id", latest)
+	db.Count(&total)
+	err := db.Order("vl.last_watched_at DESC").
+		Offset((page - 1) * pageSize).Limit(pageSize).Find(&videos).Error
+	return videos, total, err
+}

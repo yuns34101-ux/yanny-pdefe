@@ -2,7 +2,9 @@ package handler
 
 import (
 	"yanny-service/internal/dto"
+	"yanny-service/internal/model"
 	"yanny-service/internal/service"
+	"yanny-service/internal/util/wechat"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,9 +23,11 @@ func MpLogin(c *gin.Context) {
 
 	// 根据 AppID 查找 mp_account_id
 	mpAccountID := uint64(1) // 默认
+	var mpAccount *model.MpAccount
 	if req.AppID != "" {
 		if mp, err := service.FindMpAccountByAppID(req.AppID); err == nil {
 			mpAccountID = mp.ID
+			mpAccount = mp
 		}
 	}
 
@@ -43,11 +47,17 @@ func MpLogin(c *gin.Context) {
 		avatarURL = req.AvatarURL
 
 	case "wechat":
-		// TODO: 调用微信 code2Session
-		// wxResp := wechat.Code2Session(req.Code)
-		// openid = wxResp.Openid
-		// unionid = wxResp.Unionid
-		openid = "wx_" + req.Code
+		if mpAccount == nil {
+			dto.Error(c, dto.ErrCodeMpAccountNotFound, "小程序账号不存在")
+			return
+		}
+		wxResp, err := wechat.Code2Session(mpAccount.AppID, mpAccount.AppSecret, req.Code)
+		if err != nil {
+			dto.Error(c, dto.ErrCodeLoginFailed, "登录失败："+err.Error())
+			return
+		}
+		openid = wxResp.Openid
+		unionid = wxResp.Unionid
 		nickname = "微信用户"
 
 	case "douyin":
@@ -65,8 +75,8 @@ func MpLogin(c *gin.Context) {
 		nickname = "用户"
 	}
 
-	// 查找或创建用户
-	user, isNew, err := service.FindOrCreateUser(mpAccountID, openid, unionid, nickname, avatarURL, c.ClientIP())
+	// 查找或创建用户（inviter_user_id 仅新用户首次登录生效，实现分享裂变的单层邀请归属）
+	user, isNew, err := service.FindOrCreateUser(mpAccountID, openid, unionid, nickname, avatarURL, c.ClientIP(), req.InviterUserID)
 	if err != nil {
 		dto.Error(c, dto.ErrCodeInternal, "登录失败："+err.Error())
 		return

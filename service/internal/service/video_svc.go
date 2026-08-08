@@ -12,9 +12,9 @@ import (
 )
 
 // 视频处理规则
-const (
-	videoProcessRule = "avthumb/mp4/s/1280x720/vb/2000k/ab/128k/acodec/aac"
-)
+// 七牛存储桶未开通实时转码（fop）服务，开启会导致请求被拒绝（this fop is blocked, please use pfop service）
+// 暂时注释，直接签名原片 URL 播放
+// const videoProcessRule = "avthumb/mp4/s/1280x720/vb/2000k/ab/128k/acodec/aac"
 
 // CreateCategory 创建分类
 func CreateCategory(entityID, mpAccountID uint64, name, iconURL string, sortOrder int) (*model.VideoCategory, error) {
@@ -90,7 +90,7 @@ func signVideoURLs(v *model.Video) {
 	}
 	if v.VideoURL != "" {
 		ttl := time.Duration(config.AppConfig.Qiniu.GetMediaTTL()) * time.Hour
-		v.VideoURL = qiniu.SignURL(qiniu.EnsureProtocol(v.VideoURL), videoProcessRule, ttl)
+		v.VideoURL = qiniu.SignURL(qiniu.EnsureProtocol(v.VideoURL), "", ttl)
 	}
 }
 
@@ -129,4 +129,24 @@ func GetVideoDetail(videoID uint64) (*model.Video, error) {
 	}
 	signVideoURLs(v)
 	return v, nil
+}
+
+// GetFavoriteVideosForMp 我的收藏视频列表
+func GetFavoriteVideosForMp(mpAccountID, userID uint64, page, pageSize int) ([]model.Video, int64, error) {
+	videos, total, err := repository.ListFavoriteVideosByUser(mpAccountID, userID, page, pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	signVideoListURLs(videos)
+	return videos, total, nil
+}
+
+// GetHistoryVideosForMp 观看历史视频列表（按视频去重，取最近一次播放）
+func GetHistoryVideosForMp(mpAccountID, userID uint64, page, pageSize int) ([]model.Video, int64, error) {
+	videos, total, err := repository.ListHistoryVideosByUser(mpAccountID, userID, page, pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	signVideoListURLs(videos)
+	return videos, total, nil
 }

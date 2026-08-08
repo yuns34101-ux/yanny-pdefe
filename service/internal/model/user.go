@@ -17,6 +17,7 @@ type User struct {
 	City        string    `gorm:"size:50;not null;default:''" json:"city"`
 	Country     string    `gorm:"size:50;not null;default:''" json:"country"`
 	Status      int8      `gorm:"not null;default:1" json:"status"`
+	InviterUserID *uint64 `gorm:"null;index:idx_inviter" json:"inviter_user_id"`
 	LastLoginAt *time.Time `gorm:"null" json:"last_login_at"`
 	LastLoginIP string    `gorm:"size:50;not null;default:''" json:"last_login_ip"`
 	CreatedAt   time.Time `gorm:"not null;autoCreateTime" json:"created_at"`

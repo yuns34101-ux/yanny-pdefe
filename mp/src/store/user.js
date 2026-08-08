@@ -6,6 +6,8 @@ export const useUserStore = defineStore('user', () => {
   const userInfo = ref(null)
   const token = ref(uni.getStorageSync('mp_token') || '')
   const platform = ref('wechat') // wechat | douyin | h5 | mock
+  const ready = ref(!!token.value) // 登录就绪状态：token 已存在或静默登录已完成
+  const loginError = ref('')
 
   const isLoggedIn = computed(() => !!token.value)
   const userId = computed(() => userInfo.value?.user_id || 0)
@@ -26,38 +28,48 @@ export const useUserStore = defineStore('user', () => {
 
   // 静默登录（进场时调用，无 UI）
   async function silentLogin() {
-    const p = detectPlatform()
-    platform.value = p
+    ready.value = false
+    loginError.value = ''
+    try {
+      const p = detectPlatform()
+      platform.value = p
 
-    if (p === 'wechat') {
-      // 微信小程序：wx.login 获取 code
-      return new Promise((resolve, reject) => {
-        uni.login({
-          provider: 'weixin',
-          success: async (res) => {
-            try {
-              await doLogin(res.code, 'wechat')
-              resolve()
-            } catch (e) { reject(e) }
-          },
-          fail: (e) => reject(e),
+      if (p === 'wechat') {
+        // 微信小程序：wx.login 获取 code
+        await new Promise((resolve, reject) => {
+          uni.login({
+            provider: 'weixin',
+            success: async (res) => {
+              try {
+                await doLogin(res.code, 'wechat')
+                resolve()
+              } catch (e) { reject(e) }
+            },
+            fail: (e) => reject(e),
+          })
         })
-      })
+      } else {
+        // H5 / mock / 其他：直接使用设备标识
+        const deviceId = uni.getStorageSync('device_id') || `dev_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        uni.setStorageSync('device_id', deviceId)
+        await doLogin(deviceId, p)
+      }
+      ready.value = true
+    } catch (e) {
+      loginError.value = e.message || '登录失败'
+      throw e
     }
-
-    // H5 / mock / 其他：直接使用设备标识
-    const deviceId = uni.getStorageSync('device_id') || `dev_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-    uni.setStorageSync('device_id', deviceId)
-    return doLogin(deviceId, p)
   }
 
   // 实际登录请求
   async function doLogin(code, platformType) {
     const appId = getAppId()
+    const inviter = Number(uni.getStorageSync('pending_inviter')) || 0
     const res = await post('/login', {
       code,
       platform: platformType,
       app_id: appId,
+      inviter_user_id: inviter,
     })
     token.value = res.data.token
     userInfo.value = {
@@ -66,6 +78,7 @@ export const useUserStore = defineStore('user', () => {
       avatar_url: res.data.avatar_url,
     }
     uni.setStorageSync('mp_token', res.data.token)
+    if (inviter) uni.removeStorageSync('pending_inviter')
     return res.data
   }
 
@@ -102,8 +115,21 @@ export const useUserStore = defineStore('user', () => {
     uni.removeStorageSync('mp_token')
   }
 
+  // 等待登录就绪（页面发起业务请求前调用，避免 token 未就绪时被 401）
+  function waitForReady() {
+    if (ready.value) return Promise.resolve()
+    return new Promise((resolve) => {
+      const timer = setInterval(() => {
+        if (ready.value) {
+          clearInterval(timer)
+          resolve()
+        }
+      }, 100)
+    })
+  }
+
   return {
-    userInfo, token, platform, isLoggedIn, userId,
-    silentLogin, doLogin, updatePhone, logout, detectPlatform,
+    userInfo, token, platform, ready, loginError, isLoggedIn, userId,
+    silentLogin, doLogin, updatePhone, logout, detectPlatform, waitForReady,
   }
 })

@@ -9,8 +9,8 @@
         </view>
       </view>
       <text class="entity-desc" v-if="entity?.description">{{ entity.description }}</text>
-      <text class="entity-line" v-if="entity?.address">地址: {{ entity.address }}</text>
-      <text class="entity-line entity-contact" v-if="entity?.contact_phone">联系方式：{{ entity.contact_phone }}</text>
+      <text class="entity-line" v-if="entity?.address" @click="navigateToAddress">地址: {{ entity.address }}</text>
+      <text class="entity-line entity-contact" v-if="entity?.contact_phone" @click="callPhone">联系方式：{{ entity.contact_phone }}</text>
       <text class="entity-line">{{ entityStore.videoCount }}条原创内容</text>
       <text class="entity-line">{{ entityStore.followerCount }}个朋友关注</text>
 
@@ -18,9 +18,9 @@
         <view class="action-btn" :class="{ followed: entityStore.followed }" @click="handleFollow">
           <text>{{ entityStore.followed ? '✓ 已关注' : '+ 关注' }}</text>
         </view>
-        <view class="action-btn outline" @click="onMessage">
+        <button class="action-btn outline contact-btn" open-type="contact">
           <text>私信</text>
-        </view>
+        </button>
       </view>
     </view>
 
@@ -123,8 +123,23 @@ async function handleFollow() {
   await entityStore.toggleFollow()
 }
 
-function onMessage() {
-  uni.showToast({ title: '功能开发中', icon: 'none' })
+function callPhone() {
+  if (!entity.value?.contact_phone) return
+  uni.makePhoneCall({ phoneNumber: entity.value.contact_phone })
+}
+
+function navigateToAddress() {
+  if (!entity.value?.address) return
+  if (entity.value.latitude && entity.value.longitude) {
+    uni.openLocation({
+      latitude: entity.value.latitude,
+      longitude: entity.value.longitude,
+      name: entity.value.name,
+      address: entity.value.address,
+    })
+  } else {
+    uni.showToast({ title: '该主体暂未配置精确位置', icon: 'none' })
+  }
 }
 
 function formatCount(n) {
@@ -138,7 +153,8 @@ onReachBottom(() => {
   if (hasMore.value) loadMore()
 })
 
-onMounted(() => {
+onMounted(async () => {
+  await userStore.waitForReady()
   entityStore.fetchEntityInfo()
   videoStore.fetchVideos(0)
   videoStore.fetchCategories(1, 1)
@@ -162,6 +178,8 @@ onMounted(() => {
 .action-btn text { font-size: 26rpx; color: #333; }
 .action-btn.followed { background: #f2f2f2; }
 .action-btn.outline { background: #f2f2f2; }
+.contact-btn { margin: 0; line-height: normal; border: none; }
+.contact-btn::after { border: none; }
 .section-title { font-size: 30rpx; font-weight: 700; color: #333; padding: 24rpx 24rpx 16rpx; border-bottom: 1rpx solid #eee; margin: 0 24rpx; }
 .category-row { display: flex; flex-wrap: wrap; padding: 20rpx 24rpx; gap: 32rpx 40rpx; }
 .category-tag { display: flex; align-items: center; gap: 8rpx; font-size: 26rpx; color: #666; padding-bottom: 8rpx; border-bottom: 4rpx solid transparent; }

@@ -1,12 +1,15 @@
 package handler
 
 import (
+	"errors"
+	"log"
 	"yanny-service/internal/dto"
 	"yanny-service/internal/middleware"
 	"yanny-service/internal/repository"
 	"yanny-service/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // ========== 主体信息 ==========
@@ -21,7 +24,12 @@ func MpGetEntity(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	entity, err := service.GetEntityForMp(entityID, mpAccountID, userID)
 	if err != nil {
-		dto.Error(c, dto.ErrCodeEntityNotFound, "主体不存在")
+		if errors.Is(err, gorm.ErrRecordNotFound) || err.Error() == "主体不存在" {
+			dto.Error(c, dto.ErrCodeEntityNotFound, "主体不存在")
+			return
+		}
+		log.Printf("MpGetEntity 内部错误: entity_id=%d mp_account_id=%d err=%v", entityID, mpAccountID, err)
+		dto.Error(c, dto.ErrCodeInternal, "服务器内部错误")
 		return
 	}
 	dto.Success(c, entity)
@@ -132,7 +140,7 @@ func MpToggleFavorite(c *gin.Context) {
 	dto.Success(c, gin.H{"favored": favored})
 }
 
-// MpMyFavorites 我的收藏列表
+// MpMyFavorites 我的收藏列表（返回视频完整信息，供首页三列宫格复用）
 func MpMyFavorites(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	mpAccountID := middleware.GetMpAccountID(c)
@@ -140,12 +148,28 @@ func MpMyFavorites(c *gin.Context) {
 	if err := c.ShouldBindQuery(&p); err != nil {
 		p = dto.DefaultPagination()
 	}
-	favs, total, err := repository.ListFavoritesByUser(mpAccountID, userID, p.Page, p.PageSize)
+	favs, total, err := service.GetFavoriteVideosForMp(mpAccountID, userID, p.Page, p.PageSize)
 	if err != nil {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())
 		return
 	}
 	dto.SuccessPage(c, favs, p.Page, p.PageSize, total)
+}
+
+// MpMyHistory 观看历史列表（按视频去重，取最近一次播放，返回视频完整信息供首页三列宫格复用）
+func MpMyHistory(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	mpAccountID := middleware.GetMpAccountID(c)
+	var p dto.Pagination
+	if err := c.ShouldBindQuery(&p); err != nil {
+		p = dto.DefaultPagination()
+	}
+	history, total, err := service.GetHistoryVideosForMp(mpAccountID, userID, p.Page, p.PageSize)
+	if err != nil {
+		dto.Error(c, dto.ErrCodeInternal, err.Error())
+		return
+	}
+	dto.SuccessPage(c, history, p.Page, p.PageSize, total)
 }
 
 // ========== 分享 ==========

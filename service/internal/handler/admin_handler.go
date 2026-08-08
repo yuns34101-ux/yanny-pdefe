@@ -140,7 +140,7 @@ func CreateEntity(c *gin.Context) {
 		return
 	}
 	entity, err := service.CreateEntity(req.Name, qiniu.StripQuery(req.LogoURL), req.Description,
-		req.ContactPhone, req.ContactEmail, req.Address, req.Extra,
+		req.ContactPhone, req.ContactEmail, req.Address, req.Latitude, req.Longitude, req.Extra,
 		req.SortOrder, req.Status)
 	if err != nil {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())
@@ -194,7 +194,7 @@ func UpdateEntity(c *gin.Context) {
 		return
 	}
 	if err := service.UpdateEntity(id, req.Name, qiniu.StripQuery(req.LogoURL), req.Description,
-		req.ContactPhone, req.ContactEmail, req.Address, req.Extra,
+		req.ContactPhone, req.ContactEmail, req.Address, req.Latitude, req.Longitude, req.Extra,
 		req.SortOrder, req.Status); err != nil {
 		dto.Error(c, dto.ErrCodeInternal, err.Error())
 		return

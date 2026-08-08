@@ -15,6 +15,8 @@ type Entity struct {
 	ContactPhone string         `gorm:"size:20;not null;default:''" json:"contact_phone"`
 	ContactEmail string         `gorm:"size:100;not null;default:''" json:"contact_email"`
 	Address      string         `gorm:"size:300;not null;default:''" json:"address"`
+	Latitude     *float64       `gorm:"type:decimal(10,7)" json:"latitude"`
+	Longitude    *float64       `gorm:"type:decimal(10,7)" json:"longitude"`
 	Extra        *string        `gorm:"type:json" json:"extra"`
 	SortOrder    int            `gorm:"not null;default:0" json:"sort_order"`
 	Status       int8           `gorm:"not null;default:1" json:"status"`

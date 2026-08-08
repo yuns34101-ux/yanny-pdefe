@@ -44,7 +44,10 @@
             <!-- 进度条 -->
             <view class="progress-row">
               <text class="progress-time">{{ formatDuration(v._currentTime) }}</text>
-              <text class="progress-speed" @click.stop="toggleSpeed(v)">倍数</text>
+              <view class="progress-speed" @click.stop="openSpeedPanel(v)">
+                <image :src="icons.speed" class="speed-icon" />
+                <text>{{ (v._playbackRate || 1) + 'x' }}</text>
+              </view>
             </view>
             <view class="progress-track">
               <view class="progress-fill" :style="{ width: (v._progress || 0) + '%' }" />
@@ -68,21 +71,24 @@
               </view>
               <view class="bottom-actions">
                 <view class="action-btn" @click.stop="handleLike(v)">
-                  <text class="action-icon" :style="{ color: v._liked ? '#409EFF' : '#fff' }">👍</text>
+                  <image :src="v._liked ? icons.likeActive : icons.like" class="action-icon" />
                   <text class="action-count">{{ formatCount(v.like_count) }}</text>
                 </view>
-                <view class="action-btn" @click.stop="handleShare(v)">
-                  <text class="action-icon">↗️</text>
+                <button
+                  class="action-btn share-btn"
+                  open-type="share"
+                  :data-video="v.id"
+                  @click.stop="prepareShare(v)"
+                >
+                  <image :src="icons.share" class="action-icon" />
                   <text class="action-count">{{ formatCount(v.share_count) }}</text>
-                </view>
+                </button>
                 <view class="action-btn" @click.stop="handleFavorite(v)">
-                  <text class="action-icon" :style="{ color: v._favored ? '#ff4d4f' : '#fff' }">
-                    {{ v._favored ? '❤️' : '🤍' }}
-                  </text>
+                  <image :src="v._favored ? icons.favoriteActive : icons.favorite" class="action-icon" />
                   <text class="action-count">{{ formatCount(v.collect_count) }}</text>
                 </view>
                 <view class="action-btn" @click.stop="handleComment(v)">
-                  <text class="action-icon">💬</text>
+                  <image :src="icons.comment" class="action-icon" />
                   <text class="action-count">{{ formatCount(v.comment_count) }}</text>
                 </view>
               </view>
@@ -134,17 +140,33 @@
         <text class="send-btn" @click="submitComment">发送</text>
       </view>
     </view>
+
+    <!-- 倍速选择面板 -->
+    <view class="speed-mask" v-if="showSpeedPanel" @click="showSpeedPanel = false">
+      <view class="speed-panel" @click.stop>
+        <view
+          v-for="rate in speedOptions"
+          :key="rate"
+          class="speed-option"
+          :class="{ active: (speedTarget?._playbackRate || 1) === rate }"
+          @click="selectSpeed(rate)"
+        >
+          <text>{{ rate }}x</text>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import { useVideoStore } from '@/store/video'
 import { useUserStore } from '@/store/user'
 import { useEntityStore } from '@/store/entity'
 import { createTrackPayload } from '@/utils/sign'
 import { get, post } from '@/utils/request'
+import { icons } from '@/utils/icons'
 
 const videoStore = useVideoStore()
 const userStore = useUserStore()
@@ -167,6 +189,14 @@ const commentTotal = ref(0)
 const commentText = ref('')
 const replyTarget = ref(null)
 const currentVideo = ref(null)
+
+// 倍速面板
+const showSpeedPanel = ref(false)
+const speedTarget = ref(null)
+const speedOptions = [0.5, 1, 1.25, 1.5, 2]
+
+// 分享（分享好友 + 裂变邀请）
+const shareTarget = ref(null)
 
 // ========== 视频加载 + 分页预加载 ==========
 
@@ -291,12 +321,18 @@ function onTimeUpdate(v, e) {
   v._progress = duration ? (v._currentTime / duration) * 100 : 0
 }
 
-function toggleSpeed(v) {
-  const rates = [1, 1.25, 1.5, 2]
-  const idx = rates.indexOf(v._playbackRate || 1)
-  v._playbackRate = rates[(idx + 1) % rates.length]
+function openSpeedPanel(v) {
+  speedTarget.value = v
+  showSpeedPanel.value = true
+}
+
+function selectSpeed(rate) {
+  const v = speedTarget.value
+  if (!v) return
+  v._playbackRate = rate
   const ctx = uni.createVideoContext('video-' + v.id)
-  ctx?.playbackRate(v._playbackRate)
+  ctx?.playbackRate(rate)
+  showSpeedPanel.value = false
 }
 
 function formatDuration(sec) {
@@ -313,16 +349,23 @@ function handleComment(v) {
   loadComments(v.id)
 }
 
-function handleShare(v) {
-  // 分享不强制登录，但需记录
-  const shareType = 'wechat_friend'
-  if (userStore.isLoggedIn) {
-    videoStore.recordShare(v.id, shareType)
-    v.share_count++
-  }
-  // 触发微信分享
-  uni.share({ provider: 'weixin', type: 0, title: v.title, imageUrl: v.cover_url })
+// 点击分享按钮时记录待分享视频，实际分享卡片由 onShareAppMessage 生成
+function prepareShare(v) {
+  shareTarget.value = v
 }
+
+// 微信小程序标准"分享给好友"钩子：卡片用视频封面+标题，路径带入当前用户 ID 实现分享裂变邀请
+onShareAppMessage(() => {
+  const v = shareTarget.value
+  if (!v) return {}
+  videoStore.recordShare(v.id, 'wechat_friend')
+  v.share_count++
+  return {
+    title: v.title,
+    imageUrl: v.cover_url,
+    path: `/pages/player/player?videoId=${v.id}&inviter=${userStore.userId}`,
+  }
+})
 
 // ========== 评论 ==========
 
@@ -411,7 +454,12 @@ function goBack() {
 
 // ========== 生命周期 ==========
 
-onLoad((query) => {
+onLoad(async (query) => {
+  // 分享裂变：若通过分享链接直接冷启动进入播放页，此处兜底捕获邀请人（App.vue onLaunch 是主路径）
+  if (query.inviter && !uni.getStorageSync('mp_token')) {
+    uni.setStorageSync('pending_inviter', query.inviter)
+  }
+  await userStore.waitForReady()
   // 接收首页传来的初始视频 ID 和分类
   const videoId = query.videoId
   const categoryId = query.categoryId || 0
@@ -450,7 +498,8 @@ onUnmounted(() => {
 /* 进度条 */
 .progress-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10rpx; }
 .progress-time { font-size: 22rpx; color: #fff; }
-.progress-speed { font-size: 22rpx; color: #fff; }
+.progress-speed { display: flex; align-items: center; gap: 6rpx; font-size: 22rpx; color: #fff; padding: 4rpx 14rpx; border-radius: 20rpx; background: rgba(255,255,255,0.15); }
+.speed-icon { width: 22rpx; height: 22rpx; }
 .progress-track { position: relative; height: 4rpx; background: rgba(255,255,255,0.3); border-radius: 2rpx; margin-bottom: 16rpx; }
 .progress-fill { position: absolute; left: 0; top: 0; bottom: 0; background: #fff; border-radius: 2rpx; }
 .progress-dot { position: absolute; top: 50%; width: 16rpx; height: 16rpx; margin-left: -8rpx; margin-top: -8rpx; border-radius: 50%; background: #fff; }
@@ -468,8 +517,9 @@ onUnmounted(() => {
 .follow-pill.followed { background: rgba(255,255,255,0.08); }
 .follow-pill.followed text { color: rgba(255,255,255,0.6); }
 .bottom-actions { display: flex; align-items: center; gap: 32rpx; }
-.action-btn { display: flex; flex-direction: column; align-items: center; }
-.action-icon { font-size: 44rpx; }
+.action-btn { display: flex; flex-direction: column; align-items: center; background: none; border: none; padding: 0; margin: 0; line-height: normal; }
+.action-btn::after { border: none; }
+.action-icon { width: 48rpx; height: 48rpx; }
 .action-count { font-size: 20rpx; color: #fff; margin-top: 4rpx; }
 
 /* 返回 */
@@ -496,4 +546,11 @@ onUnmounted(() => {
 .comment-input-bar { display: flex; align-items: center; padding: 16rpx 30rpx; border-top: 1rpx solid #eee; background: #fff; }
 .comment-input { flex: 1; height: 64rpx; background: #f5f5f5; border-radius: 32rpx; padding: 0 24rpx; font-size: 26rpx; }
 .send-btn { color: #409EFF; font-size: 28rpx; margin-left: 20rpx; }
+
+/* 倍速选择面板 */
+.speed-mask { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 40; display: flex; align-items: flex-end; }
+.speed-panel { width: 100%; background: #1c1c1e; border-radius: 24rpx 24rpx 0 0; padding: 16rpx 0 40rpx; }
+.speed-option { text-align: center; padding: 28rpx 0; }
+.speed-option text { font-size: 30rpx; color: #fff; }
+.speed-option.active text { color: #409EFF; font-weight: 600; }
 </style>

@@ -12,6 +12,7 @@ type MpLoginRequest struct {
 	Phone         string `json:"phone"`          // H5 手机号登录
 	Nickname      string `json:"nickname"`       // H5 昵称
 	AvatarURL     string `json:"avatar_url"`     // H5 头像
+	InviterUserID uint64 `json:"inviter_user_id"` // 邀请人用户 ID（分享裂变，仅新用户首次登录生效）
 }
 
 // MpLoginResponse 小程序登录响应

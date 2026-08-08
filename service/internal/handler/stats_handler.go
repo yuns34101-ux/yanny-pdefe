@@ -58,3 +58,20 @@ func GetRegionStats(c *gin.Context) {
 	regions, _ := repository.GetRegionStats(scope, days)
 	dto.Success(c, regions)
 }
+
+// GetInviteStats 分享裂变统计（按邀请人排行）
+func GetInviteStats(c *gin.Context) {
+	limit := 20
+	if l := c.Query("limit"); l != "" {
+		fmt.Sscanf(l, "%d", &limit)
+	}
+	stats, totalInvitedUsers, err := repository.GetInviteStats(limit)
+	if err != nil {
+		dto.Error(c, dto.ErrCodeInternal, err.Error())
+		return
+	}
+	dto.Success(c, gin.H{
+		"ranking":             stats,
+		"total_invited_users": totalInvitedUsers,
+	})
+}

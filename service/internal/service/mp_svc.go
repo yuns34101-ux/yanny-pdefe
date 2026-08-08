@@ -11,7 +11,8 @@ import (
 )
 
 // FindOrCreateUser 查找或创建用户
-func FindOrCreateUser(mpAccountID uint64, openid, unionid, nickname, avatarURL, ip string) (*model.User, bool, error) {
+// inviterUserID 为邀请人用户 ID（分享裂变），仅在创建新用户时生效，已存在用户不覆盖归属关系
+func FindOrCreateUser(mpAccountID uint64, openid, unionid, nickname, avatarURL, ip string, inviterUserID uint64) (*model.User, bool, error) {
 	user, err := repository.FindUserByOpenid(mpAccountID, openid)
 	if err == nil {
 		// 用户已存在，更新登录信息
@@ -34,6 +35,9 @@ func FindOrCreateUser(mpAccountID uint64, openid, unionid, nickname, avatarURL, 
 		Status:      1,
 		LastLoginAt: &now,
 		LastLoginIP: ip,
+	}
+	if inviterUserID > 0 && inviterUserID != user.ID {
+		user.InviterUserID = &inviterUserID
 	}
 	if err := repository.CreateUser(user); err != nil {
 		return nil, false, err

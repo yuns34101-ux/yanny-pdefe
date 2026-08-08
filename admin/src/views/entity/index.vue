@@ -108,6 +108,18 @@
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
+            <el-form-item label="纬度" prop="latitude">
+              <el-input-number v-model="form.latitude" :precision="7" :step="0.0001" controls-position="right" style="width:100%" placeholder="用于小程序端地址导航" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="经度" prop="longitude">
+              <el-input-number v-model="form.longitude" :precision="7" :step="0.0001" controls-position="right" style="width:100%" placeholder="用于小程序端地址导航" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="排序" prop="sort_order">
               <el-input-number v-model="form.sort_order" :min="0" :max="9999" />
             </el-form-item>
@@ -207,7 +219,7 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const submitting = ref(false)
 const formRef = ref(null)
-const form = reactive({ name: '', logo_url: '', description: '', contact_phone: '', contact_email: '', address: '', sort_order: 0, status: 1 })
+const form = reactive({ name: '', logo_url: '', description: '', contact_phone: '', contact_email: '', address: '', latitude: null, longitude: null, sort_order: 0, status: 1 })
 const editId = ref(null)
 
 // Logo 上传
@@ -242,7 +254,7 @@ const openDialog = (row) => {
   if (row) {
     Object.assign(form, row)
   } else {
-    Object.assign(form, { name: '', logo_url: '', description: '', contact_phone: '', contact_email: '', address: '', sort_order: 0, status: 1 })
+    Object.assign(form, { name: '', logo_url: '', description: '', contact_phone: '', contact_email: '', address: '', latitude: null, longitude: null, sort_order: 0, status: 1 })
   }
   dialogVisible.value = true
 }

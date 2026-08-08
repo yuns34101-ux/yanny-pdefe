@@ -11,7 +11,7 @@ import (
 // ========== 主体管理 ==========
 
 // CreateEntity 创建主体
-func CreateEntity(name, logoURL, desc, phone, email, addr, extra string, sortOrder int, status int8) (*model.Entity, error) {
+func CreateEntity(name, logoURL, desc, phone, email, addr string, lat, lng *float64, extra string, sortOrder int, status int8) (*model.Entity, error) {
 	entity := &model.Entity{
 		Name:         name,
 		LogoURL:      logoURL,
@@ -19,6 +19,8 @@ func CreateEntity(name, logoURL, desc, phone, email, addr, extra string, sortOrd
 		ContactPhone: phone,
 		ContactEmail: email,
 		Address:      addr,
+		Latitude:     lat,
+		Longitude:    lng,
 		SortOrder:    sortOrder,
 		Status:       status,
 	}
@@ -35,7 +37,7 @@ func CreateEntity(name, logoURL, desc, phone, email, addr, extra string, sortOrd
 }
 
 // UpdateEntity 更新主体
-func UpdateEntity(id uint64, name, logoURL, desc, phone, email, addr, extra string, sortOrder int, status int8) error {
+func UpdateEntity(id uint64, name, logoURL, desc, phone, email, addr string, lat, lng *float64, extra string, sortOrder int, status int8) error {
 	if _, err := repository.FindEntityByID(id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.New("主体不存在")
@@ -45,6 +47,7 @@ func UpdateEntity(id uint64, name, logoURL, desc, phone, email, addr, extra stri
 	updates := map[string]interface{}{
 		"name": name, "logo_url": logoURL, "description": desc,
 		"contact_phone": phone, "contact_email": email, "address": addr,
+		"latitude": lat, "longitude": lng,
 		"sort_order": sortOrder, "status": status,
 	}
 	if extra != "" {

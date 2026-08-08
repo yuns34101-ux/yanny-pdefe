@@ -47,9 +47,12 @@ const userStore = useUserStore()
 function goLogin() { uni.navigateTo({ url: '/pages/login/login' }) }
 function goFavorites() {
   if (!userStore.isLoggedIn) return goLogin()
-  uni.showToast({ title: '功能开发中', icon: 'none' })
+  uni.navigateTo({ url: '/pages/favorites/favorites' })
 }
-function goHistory() { uni.showToast({ title: '功能开发中', icon: 'none' }) }
+function goHistory() {
+  if (!userStore.isLoggedIn) return goLogin()
+  uni.navigateTo({ url: '/pages/history/history' })
+}
 function goSettings() { uni.showToast({ title: '功能开发中', icon: 'none' }) }
 function handleLogout() {
   uni.showModal({
