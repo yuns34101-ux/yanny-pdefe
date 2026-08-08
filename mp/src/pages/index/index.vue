@@ -186,7 +186,7 @@ onMounted(async () => {
 .category-tag.active { color: #333; font-weight: 700; border-bottom-color: #333; }
 .category-icon { width: 28rpx; height: 28rpx; font-size: 24rpx; }
 .video-grid { display: flex; flex-wrap: wrap; padding: 0 4rpx; gap: 4rpx; }
-.video-card { position: relative; width: calc(33.333% - 8rpx/3); margin: 0 4rpx 4rpx 0; aspect-ratio: 3/4; background: #f5f5f5; overflow: hidden; }
+.video-card { position: relative; width: calc((100% - 8rpx) / 3); aspect-ratio: 3/4; background: #f5f5f5; overflow: hidden; }
 .video-cover { width: 100%; height: 100%; display: block; }
 .video-like { position: absolute; left: 8rpx; bottom: 8rpx; display: flex; align-items: center; gap: 4rpx; }
 .like-icon { font-size: 22rpx; color: #fff; }
