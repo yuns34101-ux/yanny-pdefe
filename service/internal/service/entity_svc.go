@@ -4,6 +4,7 @@ import (
 	"errors"
 	"yanny-service/internal/model"
 	"yanny-service/internal/repository"
+	"yanny-service/internal/util/qiniu"
 
 	"gorm.io/gorm"
 )
@@ -150,6 +151,9 @@ func GetEntityForMp(entityID, mpAccountID, userID uint64) (*EntityWithStats, err
 	entity, err := repository.FindEntityByID(entityID)
 	if err != nil {
 		return nil, err
+	}
+	if entity.LogoURL != "" {
+		entity.LogoURL = qiniu.SignImageURL(entity.LogoURL)
 	}
 	videoCount, err := repository.CountVideosByEntity(entityID)
 	if err != nil {

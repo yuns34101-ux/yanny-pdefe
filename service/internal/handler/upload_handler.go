@@ -30,20 +30,11 @@ type qiniuPutPolicy struct {
 // mysqlDuplicateEntryErrNo MySQL 唯一键冲突错误码
 const mysqlDuplicateEntryErrNo = 1062
 
-// GetUploadToken 获取七牛上传 Token
-func GetUploadToken(c *gin.Context) {
-	var req struct {
-		FileType string `json:"file_type" binding:"required"` // video / image
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, dto.ErrCodeParamInvalid, "请指定 file_type: video 或 image")
-		return
-	}
-
+// buildQiniuUploadToken 生成七牛上传凭证（admin/mp 共用）
+func buildQiniuUploadToken() (gin.H, error) {
 	cfg := config.AppConfig.Qiniu
 	if cfg.AccessKey == "" || cfg.SecretKey == "" || cfg.Bucket == "" {
-		dto.Error(c, dto.ErrCodeInternal, "七牛云配置未设置（access_key/secret_key/bucket）")
-		return
+		return nil, errors.New("七牛云配置未设置（access_key/secret_key/bucket）")
 	}
 
 	// 上传凭证 1 小时有效
@@ -68,14 +59,32 @@ func GetUploadToken(c *gin.Context) {
 	// 3. 组装 Token：<AK>:<encodedSign>:<encodedPolicy>
 	token := fmt.Sprintf("%s:%s:%s", cfg.AccessKey, encodedSign, encodedPolicy)
 
-	dto.Success(c, gin.H{
+	return gin.H{
 		"token":       token,
 		"domain":      cfg.Domain,
 		"bucket":      cfg.Bucket,
 		"region":      cfg.Region,
 		"upload_host": qiniuUploadHost(cfg.Region),
 		"deadline":    deadline,
-	})
+	}, nil
+}
+
+// GetUploadToken 获取七牛上传 Token（管理后台）
+func GetUploadToken(c *gin.Context) {
+	var req struct {
+		FileType string `json:"file_type" binding:"required"` // video / image
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		dto.Error(c, dto.ErrCodeParamInvalid, "请指定 file_type: video 或 image")
+		return
+	}
+
+	result, err := buildQiniuUploadToken()
+	if err != nil {
+		dto.Error(c, dto.ErrCodeInternal, err.Error())
+		return
+	}
+	dto.Success(c, result)
 }
 
 // qiniuUploadHost 根据区域返回上传域名

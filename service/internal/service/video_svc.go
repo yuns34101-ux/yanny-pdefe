@@ -101,13 +101,24 @@ func signVideoListURLs(videos []model.Video) {
 	}
 }
 
-// GetVideosForMp 小程序端获取视频列表
+// signVideoListCoverOnly 列表场景只签封面，video_url 留空
+// 列表页（首页宫格、播放页滑动导航）不会直接播放，video_url 由播放页按需通过 GetVideoDetail 单独拉取
+func signVideoListCoverOnly(videos []model.Video) {
+	for i := range videos {
+		if videos[i].CoverURL != "" {
+			videos[i].CoverURL = qiniu.SignImageURL(videos[i].CoverURL)
+		}
+		videos[i].VideoURL = ""
+	}
+}
+
+// GetVideosForMp 小程序端获取视频列表（不含 video_url，需播放时用 GetVideoDetail 单独获取）
 func GetVideosForMp(mpAccountID, entityID, categoryID uint64, page, pageSize int) ([]model.Video, int64, error) {
 	videos, total, err := repository.ListVideosForMp(mpAccountID, entityID, categoryID, page, pageSize)
 	if err != nil {
 		return nil, 0, err
 	}
-	signVideoListURLs(videos)
+	signVideoListCoverOnly(videos)
 	return videos, total, nil
 }
 

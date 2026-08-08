@@ -78,8 +78,8 @@ onMounted(() => loadFavorites(1))
 
 <style scoped>
 .favorites-page { padding-bottom: 20rpx; background: #fff; min-height: 100vh; }
-.video-grid { display: flex; flex-wrap: wrap; padding: 0 4rpx; gap: 4rpx; }
-.video-card { position: relative; width: calc((100% - 8rpx) / 3); aspect-ratio: 3/4; background: #f5f5f5; overflow: hidden; }
+.video-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4rpx; padding: 0 4rpx; }
+.video-card { position: relative; aspect-ratio: 3/4; background: #f5f5f5; overflow: hidden; }
 .video-cover { width: 100%; height: 100%; display: block; }
 .video-like { position: absolute; left: 8rpx; bottom: 8rpx; display: flex; align-items: center; gap: 4rpx; }
 .like-icon { font-size: 22rpx; color: #fff; }

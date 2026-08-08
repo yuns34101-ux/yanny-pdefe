@@ -48,3 +48,8 @@ export function get(url, params = {}) {
 export function post(url, data = {}) {
   return request(url, { method: 'POST', data })
 }
+
+// PUT 请求
+export function put(url, data = {}) {
+  return request(url, { method: 'PUT', data })
+}

@@ -177,6 +177,9 @@ func SetupRouter() *gin.Engine {
 			mpAuth.POST("/share", handler.MpRecordShare)
 			mpAuth.GET("/interaction-status", handler.MpInteractionStatus)
 			mpAuth.POST("/follow", handler.MpToggleFollow)
+			mpAuth.POST("/user/phone", handler.MpUpdatePhone)
+			mpAuth.PUT("/user/info", handler.MpUpdateUserInfo)
+			mpAuth.POST("/upload/token", handler.MpGetUploadToken)
 		}
 
 		// 埋点上报（需登录 + 签名校验 + 限流）

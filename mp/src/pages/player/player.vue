@@ -11,9 +11,9 @@
     >
       <swiper-item v-for="(v, i) in videoList" :key="v.id">
         <view class="video-wrapper">
-          <!-- 视频播放器 -->
+          <!-- 视频播放器（video_url 按需懒加载，未就绪前展示封面占位） -->
           <video
-            v-if="Math.abs(i - currentIndex) <= 1"
+            v-if="Math.abs(i - currentIndex) <= 1 && v.video_url"
             :id="'video-' + v.id"
             :src="v.video_url"
             :poster="v.cover_url"
@@ -155,6 +155,8 @@
         </view>
       </view>
     </view>
+
+    <ProfileSetupModal />
   </view>
 </template>
 
@@ -167,6 +169,7 @@ import { useEntityStore } from '@/store/entity'
 import { createTrackPayload } from '@/utils/sign'
 import { get, post } from '@/utils/request'
 import { icons } from '@/utils/icons'
+import ProfileSetupModal from '@/components/ProfileSetupModal.vue'
 
 const videoStore = useVideoStore()
 const userStore = useUserStore()
@@ -199,8 +202,53 @@ const speedOptions = [0.5, 1, 1.25, 1.5, 2]
 const shareTarget = ref(null)
 
 // ========== 视频加载 + 分页预加载 ==========
+// 列表接口（/videos）不再返回 video_url（仅封面），播放地址由 /videos/:id 详情接口按需懒加载。
+// 这样列表页/滑动导航保持轻量，同时保证分享链接进来时能直接定位到目标视频，不受它是否在第一页影响。
 
 const hasMore = computed(() => videoList.value.length < totalCount.value)
+const pinnedVideoId = ref(null) // 分享/直达进入时优先展示的视频 ID，与列表合并时置于队首并去重
+const detailLoading = new Set() // 正在拉取详情的视频 ID，避免重复请求
+
+// 拉取单个视频详情（含签名后的 video_url）
+async function loadVideoDetail(videoId) {
+  try {
+    const res = await get(`/videos/${videoId}`)
+    return res.data ? { ...res.data, _liked: false, _favored: false } : null
+  } catch (err) {
+    console.error('加载视频详情失败', videoId, err)
+    return null
+  }
+}
+
+// 按需为当前及相邻视频补齐 video_url（懒加载，避免列表接口带全量视频地址）
+async function ensureVideoUrl(v) {
+  if (!v || v.video_url || detailLoading.has(v.id)) return
+  detailLoading.add(v.id)
+  try {
+    const res = await get(`/videos/${v.id}`)
+    if (res.data?.video_url) {
+      v.video_url = res.data.video_url
+    }
+  } catch (err) {
+    console.error('补齐视频地址失败', v.id, err)
+  } finally {
+    detailLoading.delete(v.id)
+  }
+}
+
+function ensureNearbyVideoUrls(index) {
+  for (let i = index - 1; i <= index + 1; i++) {
+    ensureVideoUrl(videoList.value[i])
+  }
+}
+
+// 合并列表数据时把已优先展示的视频置于队首并去重
+function mergeWithPinned(list) {
+  if (!pinnedVideoId.value) return list
+  const pinned = videoList.value.find(v => v.id === pinnedVideoId.value)
+  const rest = list.filter(v => v.id !== pinnedVideoId.value)
+  return pinned ? [pinned, ...rest] : list
+}
 
 async function loadVideos(pageNum = 1) {
   if (loadingMore.value && pageNum > 1) return
@@ -209,9 +257,9 @@ async function loadVideos(pageNum = 1) {
     const res = await get('/videos', { page: pageNum, page_size: pageSize })
     const list = (res.data || []).map(v => ({ ...v, _liked: false, _favored: false }))
     if (pageNum === 1) {
-      videoList.value = list
+      videoList.value = mergeWithPinned(list)
     } else {
-      videoList.value = [...videoList.value, ...list]
+      videoList.value = [...videoList.value, ...list.filter(v => v.id !== pinnedVideoId.value)]
     }
     page.value = pageNum
     totalCount.value = res.meta?.total || 0
@@ -271,7 +319,8 @@ function onSwipeChange(e) {
     loadEntityInfo(newVideo)
   }
 
-  // 预加载
+  // 按需补齐当前及相邻视频的播放地址 + 预加载下一页列表
+  ensureNearbyVideoUrls(newIndex)
   preloadNextPage()
 }
 
@@ -394,6 +443,7 @@ async function submitComment() {
     )
     commentText.value = ''
     replyTarget.value = null
+    currentVideo.value.comment_count = (currentVideo.value.comment_count || 0) + 1
     uni.showToast({ title: '评论成功', icon: 'success' })
     loadComments(currentVideo.value.id)
   } catch (err) {
@@ -460,24 +510,39 @@ onLoad(async (query) => {
     uni.setStorageSync('pending_inviter', query.inviter)
   }
   await userStore.waitForReady()
-  // 接收首页传来的初始视频 ID 和分类
-  const videoId = query.videoId
-  const categoryId = query.categoryId || 0
-  loadVideos(1).then(() => {
-    if (videoId) {
-      const idx = videoList.value.findIndex(v => v.id == videoId)
-      if (idx >= 0) {
-        currentIndex.value = idx
-        currentVideo.value = videoList.value[idx]
-        loadInteractionStatus(parseInt(videoId))
+  const videoId = query.videoId ? parseInt(query.videoId) : null
+
+  if (videoId) {
+    // 分享/直达场景：优先单独拉取目标视频详情并立即展示，不依赖它是否在列表第一页里
+    pinnedVideoId.value = videoId
+    const detail = await loadVideoDetail(videoId)
+    if (detail) {
+      videoList.value = [detail]
+      currentIndex.value = 0
+      currentVideo.value = detail
+      loadInteractionStatus(detail.id)
+      loadEntityInfo(detail) // 分享进来需要刷新对应主体信息
+    }
+    // 后台并行拉取列表用于滑动导航，加载完成后与已展示的视频去重合并
+    loadVideos(1).then(() => {
+      // 目标视频详情获取失败（如已下架）时兜底展示列表第一个
+      if (!detail && videoList.value.length) {
+        currentVideo.value = videoList.value[0]
+        loadInteractionStatus(currentVideo.value.id)
         loadEntityInfo(currentVideo.value)
       }
-    } else if (videoList.value.length) {
+      ensureNearbyVideoUrls(currentIndex.value)
+    })
+  } else {
+    // 首页跳转场景：沿用原有列表优先逻辑
+    await loadVideos(1)
+    if (videoList.value.length) {
       currentVideo.value = videoList.value[0]
       loadInteractionStatus(currentVideo.value.id)
       loadEntityInfo(currentVideo.value)
+      ensureNearbyVideoUrls(0)
     }
-  })
+  }
 })
 
 onUnmounted(() => {

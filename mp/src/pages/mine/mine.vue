@@ -5,7 +5,7 @@
       <image :src="userStore.userInfo?.avatar_url || '/static/avatar.png'" class="avatar" />
       <view class="user-info">
         <text class="nickname">{{ userStore.userInfo?.nickname || '未设置' }}</text>
-        <text class="phone">{{ userStore.userInfo?.phone || '未绑定手机号' }}</text>
+        <text class="phone" @click="goBindPhone">{{ userStore.userInfo?.phone || '未绑定手机号 ›' }}</text>
       </view>
     </view>
     <view class="user-card" v-else @click="goLogin">
@@ -45,6 +45,9 @@ import { useUserStore } from '@/store/user'
 const userStore = useUserStore()
 
 function goLogin() { uni.navigateTo({ url: '/pages/login/login' }) }
+function goBindPhone() {
+  if (!userStore.userInfo?.phone) uni.navigateTo({ url: '/pages/login/login' })
+}
 function goFavorites() {
   if (!userStore.isLoggedIn) return goLogin()
   uni.navigateTo({ url: '/pages/favorites/favorites' })

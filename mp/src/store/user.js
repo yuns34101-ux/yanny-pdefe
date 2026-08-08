@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { post } from '@/utils/request'
+import { post, put } from '@/utils/request'
 
 export const useUserStore = defineStore('user', () => {
   const userInfo = ref(null)
@@ -8,6 +8,7 @@ export const useUserStore = defineStore('user', () => {
   const platform = ref('wechat') // wechat | douyin | h5 | mock
   const ready = ref(!!token.value) // 登录就绪状态：token 已存在或静默登录已完成
   const loginError = ref('')
+  const showProfileSetup = ref(false) // 首次静默登录成功后是否弹出头像/昵称采集
 
   const isLoggedIn = computed(() => !!token.value)
   const userId = computed(() => userInfo.value?.user_id || 0)
@@ -79,23 +80,39 @@ export const useUserStore = defineStore('user', () => {
     }
     uni.setStorageSync('mp_token', res.data.token)
     if (inviter) uni.removeStorageSync('pending_inviter')
+    // 微信新用户首次登录：昵称/头像还是占位值，弹窗采集真实资料
+    if (platformType === 'wechat' && res.data.is_new_user) {
+      showProfileSetup.value = true
+    }
     return res.data
   }
 
-  // 更新用户信息（手机号授权后）
+  // 绑定手机号（已登录状态下调用，用登录时留存的 session_key 解密）
   async function updatePhone(e) {
     if (!e?.detail?.encryptedData) return
     try {
-      await post('/login', {
-        code: '',
-        platform: platform.value,
+      const res = await post('/user/phone', {
         encrypted_data: e.detail.encryptedData,
         iv: e.detail.iv,
       })
+      if (userInfo.value) userInfo.value.phone = res.data.phone
       uni.showToast({ title: '手机号绑定成功', icon: 'success' })
     } catch (e) {
       console.error('手机号绑定失败', e)
+      uni.showToast({ title: '手机号绑定失败', icon: 'none' })
+      throw e
     }
+  }
+
+  // 提交头像/昵称（chooseAvatar + nickname 采集弹窗确认后调用）
+  async function updateProfile(nickname, avatarURL) {
+    const res = await put('/user/info', { nickname, avatar_url: avatarURL })
+    if (userInfo.value) {
+      userInfo.value.nickname = res.data.nickname
+      userInfo.value.avatar_url = res.data.avatar_url
+    }
+    showProfileSetup.value = false
+    return res.data
   }
 
   // 获取 AppID
@@ -129,7 +146,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   return {
-    userInfo, token, platform, ready, loginError, isLoggedIn, userId,
-    silentLogin, doLogin, updatePhone, logout, detectPlatform, waitForReady,
+    userInfo, token, platform, ready, loginError, showProfileSetup, isLoggedIn, userId,
+    silentLogin, doLogin, updatePhone, updateProfile, logout, detectPlatform, waitForReady,
   }
 })

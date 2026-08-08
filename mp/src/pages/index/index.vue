@@ -70,15 +70,18 @@
     <view class="empty" v-if="!loading && !videos.length">
       <text>暂无视频</text>
     </view>
+
+    <ProfileSetupModal />
   </view>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { onReachBottom } from '@dcloudio/uni-app'
+import { onReachBottom, onShow, onShareAppMessage } from '@dcloudio/uni-app'
 import { useVideoStore } from '@/store/video'
 import { useUserStore } from '@/store/user'
 import { useEntityStore } from '@/store/entity'
+import ProfileSetupModal from '@/components/ProfileSetupModal.vue'
 
 const videoStore = useVideoStore()
 const userStore = useUserStore()
@@ -153,12 +156,29 @@ onReachBottom(() => {
   if (hasMore.value) loadMore()
 })
 
+let mounted = false
+
 onMounted(async () => {
   await userStore.waitForReady()
-  entityStore.fetchEntityInfo()
-  videoStore.fetchVideos(0)
+  await entityStore.fetchEntityInfo()
+  uni.setNavigationBarTitle({ title: entityStore.entity?.name || '扬昵 Yanny' })
+  videoStore.fetchVideos(activeCategory.value)
   videoStore.fetchCategories(1, 1)
+  mounted = true
 })
+
+// 从播放页返回时静默刷新视频列表，同步点赞/收藏/分享/评论等计数
+onShow(() => {
+  if (!mounted) return
+  videoStore.fetchVideos(activeCategory.value)
+})
+
+// 首页分享：卡片用主体信息（logo + 名称），带入邀请人 ID 实现分享裂变
+onShareAppMessage(() => ({
+  title: entity.value?.name || '扬昵 Yanny',
+  imageUrl: entity.value?.logo_url || '',
+  path: `/pages/index/index?inviter=${userStore.userId}`,
+}))
 </script>
 
 <style scoped>
@@ -185,8 +205,8 @@ onMounted(async () => {
 .category-tag { display: flex; align-items: center; gap: 8rpx; font-size: 26rpx; color: #666; padding-bottom: 8rpx; border-bottom: 4rpx solid transparent; }
 .category-tag.active { color: #333; font-weight: 700; border-bottom-color: #333; }
 .category-icon { width: 28rpx; height: 28rpx; font-size: 24rpx; }
-.video-grid { display: flex; flex-wrap: wrap; padding: 0 4rpx; gap: 4rpx; }
-.video-card { position: relative; width: calc((100% - 8rpx) / 3); aspect-ratio: 3/4; background: #f5f5f5; overflow: hidden; }
+.video-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4rpx; padding: 0 4rpx; }
+.video-card { position: relative; aspect-ratio: 3/4; background: #f5f5f5; overflow: hidden; }
 .video-cover { width: 100%; height: 100%; display: block; }
 .video-like { position: absolute; left: 8rpx; bottom: 8rpx; display: flex; align-items: center; gap: 4rpx; }
 .like-icon { font-size: 22rpx; color: #fff; }

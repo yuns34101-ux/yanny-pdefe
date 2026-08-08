@@ -12,12 +12,17 @@ import (
 
 // FindOrCreateUser 查找或创建用户
 // inviterUserID 为邀请人用户 ID（分享裂变），仅在创建新用户时生效，已存在用户不覆盖归属关系
-func FindOrCreateUser(mpAccountID uint64, openid, unionid, nickname, avatarURL, ip string, inviterUserID uint64) (*model.User, bool, error) {
+// sessionKey 为微信 code2Session 返回的会话密钥，每次登录都会轮换，用于后续手机号解密
+func FindOrCreateUser(mpAccountID uint64, openid, unionid, nickname, avatarURL, ip string, inviterUserID uint64, sessionKey string) (*model.User, bool, error) {
 	user, err := repository.FindUserByOpenid(mpAccountID, openid)
 	if err == nil {
-		// 用户已存在，更新登录信息
+		// 用户已存在，更新登录信息 + 轮换 session_key
 		now := time.Now()
 		repository.UpdateUserLoginInfo(user.ID, ip, &now)
+		if sessionKey != "" {
+			repository.UpdateUserSessionKey(user.ID, sessionKey)
+			user.SessionKey = sessionKey
+		}
 		return user, false, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -30,6 +35,7 @@ func FindOrCreateUser(mpAccountID uint64, openid, unionid, nickname, avatarURL, 
 		MpAccountID: mpAccountID,
 		Openid:      openid,
 		Unionid:     unionid,
+		SessionKey:  sessionKey,
 		Nickname:    nickname,
 		AvatarURL:   avatarURL,
 		Status:      1,

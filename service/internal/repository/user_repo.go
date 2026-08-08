@@ -50,3 +50,31 @@ func ListUsers(mpAccountID uint64, phone string, page, pageSize int) ([]model.Us
 func UpdateUserStatus(userID uint64, status int8) error {
 	return database.DB.Model(&model.User{}).Where("id = ?", userID).Update("status", status).Error
 }
+
+// UpdateUserSessionKey 更新用户微信 session_key（每次登录轮换）
+func UpdateUserSessionKey(userID uint64, sessionKey string) error {
+	return database.DB.Model(&model.User{}).Where("id = ?", userID).Update("session_key", sessionKey).Error
+}
+
+// UpdateUserPhone 更新用户手机号
+func UpdateUserPhone(userID uint64, phone string) error {
+	return database.DB.Model(&model.User{}).Where("id = ?", userID).Update("phone", phone).Error
+}
+
+// UpdateUserInfo 更新用户昵称/头像
+func UpdateUserInfo(userID uint64, nickname, avatarURL string) error {
+	return database.DB.Model(&model.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"nickname":   nickname,
+		"avatar_url": avatarURL,
+	}).Error
+}
+
+// FindUserByID 按 ID 查找用户
+func FindUserByID(id uint64) (*model.User, error) {
+	var user model.User
+	err := database.DB.First(&user, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}

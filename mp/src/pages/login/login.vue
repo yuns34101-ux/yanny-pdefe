@@ -17,9 +17,9 @@
 
     <!-- 登录卡片 -->
     <view class="login-card">
-      <text class="login-title">登录后体验更多功能</text>
+      <text class="login-title">绑定手机号，体验更多功能</text>
 
-      <!-- 微信登录 -->
+      <!-- 微信手机号绑定 -->
       <button
         v-if="platform === 'wechat'"
         class="platform-btn wx-btn"
@@ -28,7 +28,7 @@
         :loading="loading"
       >
         <text class="btn-icon">💬</text>
-        <text>微信手机号一键登录</text>
+        <text>微信一键绑定手机号</text>
       </button>
 
       <!-- 抖音登录 -->
@@ -91,18 +91,18 @@ const brandImage = ref('') // 可配置的品牌宣传图
 
 const platform = computed(() => userStore.platform)
 
-// 微信手机号登录
+// 微信手机号绑定（登录早已由 App.vue 静默完成，这里只做手机号授权+绑定）
 async function handleWxPhoneLogin(e) {
+  if (!e.detail?.encryptedData) {
+    uni.showToast({ title: '未授权手机号', icon: 'none' })
+    return
+  }
   loading.value = true
   try {
-    if (e.detail?.encryptedData) {
-      await userStore.updatePhone(e)
-    }
-    await userStore.silentLogin()
-    uni.showToast({ title: '登录成功', icon: 'success' })
+    await userStore.updatePhone(e)
     setTimeout(() => uni.navigateBack(), 1000)
   } catch (err) {
-    uni.showToast({ title: '登录失败', icon: 'none' })
+    // updatePhone 内部已 toast 失败提示
   } finally {
     loading.value = false
   }

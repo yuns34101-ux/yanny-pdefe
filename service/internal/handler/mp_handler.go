@@ -31,7 +31,7 @@ func MpLogin(c *gin.Context) {
 		}
 	}
 
-	var openid, unionid, nickname, avatarURL string
+	var openid, unionid, nickname, avatarURL, sessionKey string
 
 	switch req.Platform {
 	case "mock":
@@ -58,6 +58,7 @@ func MpLogin(c *gin.Context) {
 		}
 		openid = wxResp.Openid
 		unionid = wxResp.Unionid
+		sessionKey = wxResp.SessionKey
 		nickname = "微信用户"
 
 	case "douyin":
@@ -76,7 +77,7 @@ func MpLogin(c *gin.Context) {
 	}
 
 	// 查找或创建用户（inviter_user_id 仅新用户首次登录生效，实现分享裂变的单层邀请归属）
-	user, isNew, err := service.FindOrCreateUser(mpAccountID, openid, unionid, nickname, avatarURL, c.ClientIP(), req.InviterUserID)
+	user, isNew, err := service.FindOrCreateUser(mpAccountID, openid, unionid, nickname, avatarURL, c.ClientIP(), req.InviterUserID, sessionKey)
 	if err != nil {
 		dto.Error(c, dto.ErrCodeInternal, "登录失败："+err.Error())
 		return
