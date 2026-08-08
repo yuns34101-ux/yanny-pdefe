@@ -21,6 +21,7 @@ export const useVideoStore = defineStore('video', () => {
         entity_id: entityId,
         page,
         page_size: pageSize,
+        _t: Date.now(), // 破缓存：微信 uni.request 会缓存 GET，导致列表计数不更新
       })
       const list = res.data || []
       if (page === 1) {

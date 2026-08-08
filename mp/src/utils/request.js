@@ -53,3 +53,24 @@ export function post(url, data = {}) {
 export function put(url, data = {}) {
   return request(url, { method: 'PUT', data })
 }
+
+// 文件上传（后端代理中转，不直传七牛）
+export function uploadFile(url, filePath, name = 'file') {
+  const token = uni.getStorageSync('mp_token')
+  return new Promise((resolve, reject) => {
+    uni.uploadFile({
+      url: BASE_URL + url,
+      filePath,
+      name,
+      header: { Authorization: 'Bearer ' + token },
+      success(res) {
+        try {
+          const data = JSON.parse(res.data)
+          if (data.code === 0) resolve(data.data)
+          else reject(new Error(data.message || '上传失败'))
+        } catch { reject(new Error('解析上传响应失败')) }
+      },
+      fail: reject,
+    })
+  })
+}

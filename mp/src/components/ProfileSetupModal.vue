@@ -16,7 +16,6 @@
         placeholder="请输入昵称"
       />
 
-      <!-- 手机号为可选授权（仅微信支持一键授权）：用户拒绝不阻断，身份仍保持已用 openid 换取的游客登录态 -->
       <button
         v-if="userStore.platform === 'wechat'"
         class="phone-btn"
@@ -40,7 +39,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useUserStore } from '@/store/user'
-import { post } from '@/utils/request'
+import { post, uploadFile } from '@/utils/request'
 
 const userStore = useUserStore()
 const nickname = ref('')
@@ -54,41 +53,18 @@ function onChooseAvatar(e) {
   avatarUrl.value = e.detail.avatarUrl
 }
 
-// 手机号为可选授权：用户拒绝（errMsg 非 ok）不阻断任何流程，仍保持 openid 换取的登录态
 async function onGetPhoneNumber(e) {
-  if (!e.detail?.encryptedData) return // 用户拒绝授权，静默忽略，身份不变
+  if (!e.detail?.encryptedData) return
   try {
     await userStore.updatePhone(e)
     phoneBound.value = true
-  } catch {
-    // updatePhone 内部已 toast 失败提示，这里不再重复处理
-  }
+  } catch { }
 }
 
-// 直传头像到七牛（与 admin 端一致的直传模式，不做服务端中转）
+// 通过后端代理上传（小程序不直传七牛）
 async function uploadAvatar(filePath) {
-  const tokenRes = await post('/upload/token')
-  const { token, domain, upload_host } = tokenRes.data
-  const ext = filePath.split('.').pop() || 'jpg'
-  const now = Date.now()
-  const key = `images/avatars/${now}_${Math.random().toString(36).slice(2, 8)}.${ext}`
-
-  await new Promise((resolve, reject) => {
-    uni.uploadFile({
-      url: upload_host,
-      filePath,
-      name: 'file',
-      formData: { token, key },
-      success: (res) => {
-        if (res.statusCode === 200) resolve()
-        else reject(new Error('上传失败：' + res.statusCode))
-      },
-      fail: reject,
-    })
-  })
-
-  const baseUrl = domain.startsWith('http') ? domain : 'https://' + domain
-  return `${baseUrl}/${key}`
+  const result = await uploadFile('/upload/avatar', filePath)
+  return result.url
 }
 
 async function handleConfirm() {
