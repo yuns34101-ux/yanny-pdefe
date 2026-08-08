@@ -1,5 +1,5 @@
 // 埋点签名工具 — 防止伪造上报数据
-// 算法：sign = MD5(video_id:timestamp:nonce:secret)
+// 算法：sign = MD5(video_id:timestamp:nonce:jwt_secret)
 
 const SECRET = 'yanny-jwt-secret-change-in-production'
 
@@ -7,142 +7,89 @@ function generateNonce() {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36)
 }
 
-// 纯 JS MD5 实现（RFC 1321），与服务端 crypto/md5 一致
-function md5(string) {
-  function rotateLeft(lValue, iShiftBits) {
-    return (lValue << iShiftBits) | (lValue >>> (32 - iShiftBits))
-  }
-  function addUnsigned(lX, lY) {
-    const lX8 = (lX & 0x80000000)
-    const lY8 = (lY & 0x80000000)
-    const lX4 = (lX & 0x40000000)
-    const lY4 = (lY & 0x40000000)
-    const lResult = (lX & 0x3FFFFFFF) + (lY & 0x3FFFFFFF)
-    if (lX4 & lY4) return lResult ^ 0x80000000 ^ lX8 ^ lY8
-    if (lX4 | lY4) {
-      if (lResult & 0x40000000) return lResult ^ 0xC0000000 ^ lX8 ^ lY8
-      else return lResult ^ 0x40000000 ^ lX8 ^ lY8
-    }
-    return lResult ^ lX8 ^ lY8
-  }
-  function F(x, y, z) { return (x & y) | ((~x) & z) }
-  function G(x, y, z) { return (x & z) | (y & (~z)) }
-  function H(x, y, z) { return x ^ y ^ z }
-  function I(x, y, z) { return y ^ (x | (~z)) }
-  function FF(a, b, c, d, x, s, ac) {
-    a = addUnsigned(a, addUnsigned(addUnsigned(F(b, c, d), x), ac))
-    return addUnsigned(rotateLeft(a, s), b)
-  }
-  function GG(a, b, c, d, x, s, ac) {
-    a = addUnsigned(a, addUnsigned(addUnsigned(G(b, c, d), x), ac))
-    return addUnsigned(rotateLeft(a, s), b)
-  }
-  function HH(a, b, c, d, x, s, ac) {
-    a = addUnsigned(a, addUnsigned(addUnsigned(H(b, c, d), x), ac))
-    return addUnsigned(rotateLeft(a, s), b)
-  }
-  function II(a, b, c, d, x, s, ac) {
-    a = addUnsigned(a, addUnsigned(addUnsigned(I(b, c, d), x), ac))
-    return addUnsigned(rotateLeft(a, s), b)
-  }
-  function convertToWordArray(str) {
-    const lWordCount = ((str.length + 8 - ((str.length + 8) % 64)) / 64 + 1) * 16
-    const lByteCount = lWordCount * 4
-    const lWordArray = new Array(lWordCount)
-    for (let i = 0; i < lByteCount; i++) lWordArray[i >> 2] = (lWordArray[i >> 2] || 0) | (0x80 << (8 * (i % 4)))
-    for (let i = 0; i < str.length; i++) lWordArray[i >> 2] |= (str.charCodeAt(i) & 0xFF) << (8 * (i % 4))
-    lWordArray[lWordCount - 2] = str.length << 3
-    lWordArray[lWordCount - 1] = str.length >>> 29
-    return lWordArray
-  }
-  function wordToHex(lValue) {
-    let wordToHexValue = ''
-    for (let i = 0; i <= 3; i++) {
-      const byte = (lValue >>> (i * 8)) & 0xFF
-      wordToHexValue += ('0' + byte.toString(16)).slice(-2)
-    }
-    return wordToHexValue
+// ========== MD5 (RFC 1321, cmn 风格) ==========
+
+function md5(s) {
+  const bytes = []
+  for (let i = 0; i < s.length; i++) {
+    bytes.push(s.charCodeAt(i) & 0xFF)
   }
 
-  const x = convertToWordArray(string)
+  const msgLen = bytes.length
+  // 追加 padding: 0x80 + zeros
+  bytes.push(0x80)
+  while ((bytes.length % 64) !== 56) {
+    bytes.push(0x00)
+  }
+  // 追加 64-bit message length in bits (little-endian)
+  const bits = msgLen * 8
+  for (let i = 0; i < 8; i++) {
+    bytes.push((bits >>> (i * 8)) & 0xFF)
+  }
+
+  // 将 bytes 转为 32-bit words (little-endian)
+  const words = new Array(bytes.length >> 2)
+  for (let i = 0; i < bytes.length; i += 4) {
+    words[i >> 2] = bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)
+  }
+
+  // MD5 常量
   let a = 0x67452301, b = 0xEFCDAB89, c = 0x98BADCFE, d = 0x10325476
 
-  for (let k = 0; k < x.length; k += 16) {
-    const AA = a, BB = b, CC = c, DD = d
-    a = FF(a, b, c, d, x[k + 0], 7, 0xD76AA478)
-    d = FF(d, a, b, c, x[k + 1], 12, 0xE8C7B756)
-    c = FF(c, d, a, b, x[k + 2], 17, 0x242070DB)
-    b = FF(b, c, d, a, x[k + 3], 22, 0xC1BDCEEE)
-    a = FF(a, b, c, d, x[k + 4], 7, 0xF57C0FAF)
-    d = FF(d, a, b, c, x[k + 5], 12, 0x4787C62A)
-    c = FF(c, d, a, b, x[k + 6], 17, 0xA8304613)
-    b = FF(b, c, d, a, x[k + 7], 22, 0xFD469501)
-    a = FF(a, b, c, d, x[k + 8], 7, 0x698098D8)
-    d = FF(d, a, b, c, x[k + 9], 12, 0x8B44F7AF)
-    c = FF(c, d, a, b, x[k + 10], 17, 0xFFFF5BB1)
-    b = FF(b, c, d, a, x[k + 11], 22, 0x895CD7BE)
-    a = FF(a, b, c, d, x[k + 12], 7, 0x6B901122)
-    d = FF(d, a, b, c, x[k + 13], 12, 0xFD987193)
-    c = FF(c, d, a, b, x[k + 14], 17, 0xA679438E)
-    b = FF(b, c, d, a, x[k + 15], 22, 0x49B40821)
-    a = GG(a, b, c, d, x[k + 1], 5, 0xF61E2562)
-    d = GG(d, a, b, c, x[k + 6], 9, 0xC040B340)
-    c = GG(c, d, a, b, x[k + 11], 14, 0x265E5A51)
-    b = GG(b, c, d, a, x[k + 0], 20, 0xE9B6C7AA)
-    a = GG(a, b, c, d, x[k + 5], 5, 0xD62F105D)
-    d = GG(d, a, b, c, x[k + 10], 9, 0x2441453)
-    c = GG(c, d, a, b, x[k + 15], 14, 0xD8A1E681)
-    b = GG(b, c, d, a, x[k + 4], 20, 0xE7D3FBC8)
-    a = GG(a, b, c, d, x[k + 9], 5, 0x21E1CDE6)
-    d = GG(d, a, b, c, x[k + 14], 9, 0xC33707D6)
-    c = GG(c, d, a, b, x[k + 3], 14, 0xF4D50D87)
-    b = GG(b, c, d, a, x[k + 8], 20, 0x455A14ED)
-    a = GG(a, b, c, d, x[k + 13], 5, 0xA9E3E905)
-    d = GG(d, a, b, c, x[k + 2], 9, 0xFCEFA3F8)
-    c = GG(c, d, a, b, x[k + 7], 14, 0x676F02D9)
-    b = GG(b, c, d, a, x[k + 12], 20, 0x8D2A4C8A)
-    a = HH(a, b, c, d, x[k + 5], 4, 0xFFFA3942)
-    d = HH(d, a, b, c, x[k + 8], 11, 0x8771F681)
-    c = HH(c, d, a, b, x[k + 11], 16, 0x6D9D6122)
-    b = HH(b, c, d, a, x[k + 14], 23, 0xFDE5380C)
-    a = HH(a, b, c, d, x[k + 1], 4, 0xA4BEEA44)
-    d = HH(d, a, b, c, x[k + 4], 11, 0x4BDECFA9)
-    c = HH(c, d, a, b, x[k + 7], 16, 0xF6BB4B60)
-    b = HH(b, c, d, a, x[k + 10], 23, 0xBEBFBC70)
-    a = HH(a, b, c, d, x[k + 13], 4, 0x289B7EC6)
-    d = HH(d, a, b, c, x[k + 0], 11, 0xEAA127FA)
-    c = HH(c, d, a, b, x[k + 3], 16, 0xD4EF3085)
-    b = HH(b, c, d, a, x[k + 6], 23, 0x4881D05)
-    a = HH(a, b, c, d, x[k + 9], 4, 0xD9D4D039)
-    d = HH(d, a, b, c, x[k + 12], 11, 0xE6DB99E5)
-    c = HH(c, d, a, b, x[k + 15], 16, 0x1FA27CF8)
-    b = HH(b, c, d, a, x[k + 2], 23, 0xC4AC5665)
-    a = II(a, b, c, d, x[k + 0], 6, 0xF4292244)
-    d = II(d, a, b, c, x[k + 7], 10, 0x432AFF97)
-    c = II(c, d, a, b, x[k + 14], 15, 0xAB9423A7)
-    b = II(b, c, d, a, x[k + 1], 21, 0xFC93A039)
-    a = II(a, b, c, d, x[k + 8], 6, 0x655B59C3)
-    d = II(d, a, b, c, x[k + 15], 10, 0x8F0CCC92)
-    c = II(c, d, a, b, x[k + 6], 15, 0xFFEFF47D)
-    b = II(b, c, d, a, x[k + 13], 21, 0x85845DD1)
-    a = II(a, b, c, d, x[k + 4], 6, 0x6FA87E4F)
-    d = II(d, a, b, c, x[k + 11], 10, 0xFE2CE6E0)
-    c = II(c, d, a, b, x[k + 2], 15, 0xA3014314)
-    b = II(b, c, d, a, x[k + 3], 21, 0x4E0811A1)
-    a = II(a, b, c, d, x[k + 12], 6, 0xF7537E82)
-    d = II(d, a, b, c, x[k + 5], 10, 0xBD3AF235)
-    c = II(c, d, a, b, x[k + 10], 15, 0x2AD7D2BB)
-    b = II(b, c, d, a, x[k + 9], 21, 0xEB86D391)
-    a = addUnsigned(a, AA)
-    b = addUnsigned(b, BB)
-    c = addUnsigned(c, CC)
-    d = addUnsigned(d, DD)
+  function add(x, y) { return (x + y) & 0xFFFFFFFF }
+  function rotl(x, n) { return ((x << n) | (x >>> (32 - n))) & 0xFFFFFFFF }
+  function F(x, y, z) { return (x & y) | (~x & z) }
+  function G(x, y, z) { return (x & z) | (y & ~z) }
+  function H(x, y, z) { return x ^ y ^ z }
+  function I(x, y, z) { return y ^ (x | ~z) }
+
+  const S = [
+    7,12,17,22, 7,12,17,22, 7,12,17,22, 7,12,17,22,
+    5, 9,14,20, 5, 9,14,20, 5, 9,14,20, 5, 9,14,20,
+    4,11,16,23, 4,11,16,23, 4,11,16,23, 4,11,16,23,
+    6,10,15,21, 6,10,15,21, 6,10,15,21, 6,10,15,21,
+  ]
+  const K = [
+    0xD76AA478,0xE8C7B756,0x242070DB,0xC1BDCEEE,0xF57C0FAF,0x4787C62A,0xA8304613,0xFD469501,
+    0x698098D8,0x8B44F7AF,0xFFFF5BB1,0x895CD7BE,0x6B901122,0xFD987193,0xA679438E,0x49B40821,
+    0xF61E2562,0xC040B340,0x265E5A51,0xE9B6C7AA,0xD62F105D,0x02441453,0xD8A1E681,0xE7D3FBC8,
+    0x21E1CDE6,0xC33707D6,0xF4D50D87,0x455A14ED,0xA9E3E905,0xFCEFA3F8,0x676F02D9,0x8D2A4C8A,
+    0xFFFA3942,0x8771F681,0x6D9D6122,0xFDE5380C,0xA4BEEA44,0x4BDECFA9,0xF6BB4B60,0xBEBFBC70,
+    0x289B7EC6,0xEAA127FA,0xD4EF3085,0x04881D05,0xD9D4D039,0xE6DB99E5,0x1FA27CF8,0xC4AC5665,
+    0xF4292244,0x432AFF97,0xAB9423A7,0xFC93A039,0x655B59C3,0x8F0CCC92,0xFFEFF47D,0x85845DD1,
+    0x6FA87E4F,0xFE2CE6E0,0xA3014314,0x4E0811A1,0xF7537E82,0xBD3AF235,0x2AD7D2BB,0xEB86D391,
+  ]
+
+  for (let bi = 0; bi < words.length; bi += 16) {
+    let aa = a, bb = b, cc = c, dd = d
+
+    for (let i = 0; i < 64; i++) {
+      let f, g
+      if (i < 16)       { f = F(b, c, d); g = i }
+      else if (i < 32)  { f = G(b, c, d); g = (5 * i + 1) % 16 }
+      else if (i < 48)  { f = H(b, c, d); g = (3 * i + 5) % 16 }
+      else              { f = I(b, c, d); g = (7 * i) % 16 }
+      f = add(f, add(a, add(K[i], words[bi + g])))
+      a = d; d = c; c = b; b = add(b, rotl(f, S[i]))
+    }
+
+    a = add(a, aa); b = add(b, bb); c = add(c, cc); d = add(d, dd)
   }
 
-  return (wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d)).toLowerCase()
+  // 输出 32 位 hex（little-endian bytes）
+  function toHex(v) {
+    let h = ''
+    for (let i = 0; i < 4; i++) {
+      const b = (v >>> (i * 8)) & 0xFF
+      h += ('0' + b.toString(16)).slice(-2)
+    }
+    return h
+  }
+  return toHex(a) + toHex(b) + toHex(c) + toHex(d)
 }
 
-// 生成埋点签名
+// ========== 签名 ==========
+
 export function generateSign(id, timestamp) {
   const nonce = generateNonce()
   const raw = `${id}:${timestamp}:${nonce}:${SECRET}`
@@ -150,7 +97,6 @@ export function generateSign(id, timestamp) {
   return { timestamp, nonce, sign }
 }
 
-// 创建带签名的埋点数据
 export function createTrackPayload(baseData) {
   const timestamp = Date.now()
   const id = baseData.video_id || baseData.target_id || 0

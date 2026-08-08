@@ -140,7 +140,6 @@ import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import { useVideoStore } from '@/store/video'
 import { useUserStore } from '@/store/user'
 import { useEntityStore } from '@/store/entity'
-import { createTrackPayload } from '@/utils/sign'
 import { get, post } from '@/utils/request'
 import { icons } from '@/utils/icons'
 
@@ -379,13 +378,11 @@ let viewTimer = null
 function onPlay(v, index) { clearTimeout(viewTimer); viewTimer = setTimeout(() => reportView(v), 1000) }
 
 function reportView(v) {
-  const payload = createTrackPayload({ video_id: v.id, watch_duration: 0, is_complete: 0, source: 'swipe' })
-  post('/track/view', payload).catch(() => {})
+  post('/track/view', { video_id: v.id, watch_duration: 0, is_complete: 0, source: 'swipe' }).catch(() => {})
 }
 
 function onEnded(v) {
-  const payload = createTrackPayload({ video_id: v.id, watch_duration: v.duration || 0, is_complete: 1, source: 'swipe' })
-  post('/track/view', payload).catch(() => {})
+  post('/track/view', { video_id: v.id, watch_duration: v.duration || 0, is_complete: 1, source: 'swipe' }).catch(() => {})
 }
 
 function onError(v) { console.error('视频播放失败', v.id) }
