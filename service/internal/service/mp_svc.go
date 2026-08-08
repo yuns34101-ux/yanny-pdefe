@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"log"
 	"time"
 	"yanny-service/internal/middleware"
 	"yanny-service/internal/model"
@@ -11,12 +12,9 @@ import (
 )
 
 // FindOrCreateUser 查找或创建用户
-// inviterUserID 为邀请人用户 ID（分享裂变），仅在创建新用户时生效，已存在用户不覆盖归属关系
-// sessionKey 为微信 code2Session 返回的会话密钥，每次登录都会轮换，用于后续手机号解密
 func FindOrCreateUser(mpAccountID uint64, openid, unionid, nickname, avatarURL, ip string, inviterUserID uint64, sessionKey string) (*model.User, bool, error) {
 	user, err := repository.FindUserByOpenid(mpAccountID, openid)
 	if err == nil {
-		// 用户已存在，更新登录信息 + 轮换 session_key
 		now := time.Now()
 		repository.UpdateUserLoginInfo(user.ID, ip, &now)
 		if sessionKey != "" {
@@ -29,7 +27,6 @@ func FindOrCreateUser(mpAccountID uint64, openid, unionid, nickname, avatarURL, 
 		return nil, false, err
 	}
 
-	// 创建新用户
 	now := time.Now()
 	user = &model.User{
 		MpAccountID: mpAccountID,
@@ -51,12 +48,10 @@ func FindOrCreateUser(mpAccountID uint64, openid, unionid, nickname, avatarURL, 
 	return user, true, nil
 }
 
-// FindMpAccountByAppID 根据 AppID 查找小程序账号
 func FindMpAccountByAppID(appID string) (*model.MpAccount, error) {
 	return repository.FindMpAccountByAppID(appID)
 }
 
-// GenerateMpToken 生成小程序端 JWT
 func GenerateMpToken(userID, mpAccountID uint64) (string, error) {
 	return middleware.GenerateMpToken(userID, mpAccountID)
 }
@@ -72,8 +67,6 @@ func CreateComment(mpAccountID, videoID, userID uint64, content string, parentID
 		Content:       content,
 		Status:        1,
 	}
-	// 一级评论：root_id 为 NULL，写入后回填自己的 ID
-	// 二级回复：root_id 为父评论的 root_id（或 parent_id 自己如果是一级）
 	if parentID != nil && *parentID > 0 {
 		parent, err := repository.FindCommentByID(*parentID)
 		if err == nil {
@@ -82,7 +75,6 @@ func CreateComment(mpAccountID, videoID, userID uint64, content string, parentID
 			} else {
 				comment.RootID = parentID
 			}
-			// 更新父评论回复数
 			rootID := comment.RootID
 			if rootID == nil {
 				rootID = parentID
@@ -95,13 +87,11 @@ func CreateComment(mpAccountID, videoID, userID uint64, content string, parentID
 		return nil, err
 	}
 
-	// 一级评论：回填 root_id
 	if parentID == nil || *parentID == 0 {
 		repository.UpdateCommentRootID(comment.ID, comment.ID)
 		comment.RootID = &comment.ID
 	}
 
-	// 更新视频评论数
 	_ = repository.UpdateVideoCount(videoID, "comment_count", 1)
 
 	return comment, nil
@@ -124,7 +114,10 @@ func ToggleLike(mpAccountID, userID uint64, targetType string, targetID uint64) 
 		}
 		// 更新目标计数
 		if targetType == "video" {
-			_ = repository.UpdateVideoCount(targetID, "like_count", 1)
+			log.Printf("ToggleLike 创建点赞: userID=%d targetID=%d", userID, targetID)
+			if err := repository.UpdateVideoCount(targetID, "like_count", 1); err != nil {
+				log.Printf("ToggleLike UpdateVideoCount 失败: %v", err)
+			}
 		} else if targetType == "comment" {
 			_ = repository.IncrementCommentLikeCount(targetID)
 		}
@@ -143,7 +136,10 @@ func ToggleLike(mpAccountID, userID uint64, targetType string, targetID uint64) 
 		delta = -1
 	}
 	if targetType == "video" {
-		_ = repository.UpdateVideoCount(targetID, "like_count", delta)
+		log.Printf("ToggleLike 切换点赞: userID=%d targetID=%d newStatus=%d delta=%d", userID, targetID, newStatus, delta)
+		if err := repository.UpdateVideoCount(targetID, "like_count", delta); err != nil {
+			log.Printf("ToggleLike UpdateVideoCount 失败: %v", err)
+		}
 	}
 
 	return newStatus == 1, nil
@@ -220,7 +216,6 @@ func GetInteractionStatus(mpAccountID, userID, videoID uint64) map[string]bool {
 }
 
 // ToggleFollow 切换关注状态
-// entityID 为 0 时兜底为 mpAccountID 当前绑定的默认主体
 func ToggleFollow(mpAccountID, userID, entityID uint64) (bool, error) {
 	entityID, err := ResolveEntityID(entityID, mpAccountID)
 	if err != nil {

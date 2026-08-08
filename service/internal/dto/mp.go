@@ -82,6 +82,7 @@ type UpdateVideoRequest struct {
 	Description   string `json:"description"`
 	CoverURL      string `json:"cover_url"`
 	VideoURL      string `json:"video_url"`
+	EntityID      uint64 `json:"entity_id"`
 	CategoryID    uint64 `json:"category_id"`
 	Tags          string `json:"tags"`
 	Status        int8   `json:"status"`

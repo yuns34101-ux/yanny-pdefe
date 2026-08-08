@@ -154,6 +154,9 @@ func UpdateVideo(c *gin.Context) {
 	if req.VideoURL != "" {
 		updates["video_url"] = qiniu.StripQuery(req.VideoURL)
 	}
+	if req.EntityID > 0 {
+		updates["entity_id"] = req.EntityID
+	}
 	if req.CategoryID > 0 {
 		updates["category_id"] = req.CategoryID
 	}
@@ -204,7 +207,6 @@ func MpGetVideos(c *gin.Context) {
 	if entityID == 0 {
 		entityID, _ = parseUintQuery(c, "entity_id")
 	}
-	// entityID 为 0 时解析默认主体，避免列出其他主体的视频
 	if entityID == 0 {
 		if resolved, err := service.ResolveEntityID(0, mpAccountID); err == nil {
 			entityID = resolved
