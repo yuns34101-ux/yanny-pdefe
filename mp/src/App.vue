@@ -33,6 +33,11 @@ onLaunch(async (options) => {
   } else {
     userStore.token = token
     userStore.ready = true
+    // 从 storage 恢复用户信息，避免重启后 userInfo 为空导致"我的"页显示未绑定
+    const cached = uni.getStorageSync('mp_user_info')
+    if (cached) {
+      try { userStore.userInfo = JSON.parse(cached) } catch { /* ignore */ }
+    }
   }
 })
 </script>

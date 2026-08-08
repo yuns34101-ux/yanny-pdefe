@@ -13,6 +13,13 @@ export const useUserStore = defineStore('user', () => {
   const isLoggedIn = computed(() => !!token.value)
   const userId = computed(() => userInfo.value?.user_id || 0)
 
+  // 同步 userInfo 到本地 storage（解决 App 重启后 userInfo 丢失导致"我的"页显示未绑定）
+  function persistUserInfo() {
+    if (userInfo.value) {
+      uni.setStorageSync('mp_user_info', JSON.stringify(userInfo.value))
+    }
+  }
+
   // 检测当前平台
   function detectPlatform() {
     // #ifdef MP-WEIXIN
@@ -77,8 +84,10 @@ export const useUserStore = defineStore('user', () => {
       user_id: res.data.user_id,
       nickname: res.data.nickname,
       avatar_url: res.data.avatar_url,
+      phone: res.data.phone || '',
     }
     uni.setStorageSync('mp_token', res.data.token)
+    persistUserInfo()
     if (inviter) uni.removeStorageSync('pending_inviter')
     // 微信新用户首次登录：昵称/头像还是占位值，弹窗采集真实资料
     if (platformType === 'wechat' && res.data.is_new_user) {
@@ -95,7 +104,10 @@ export const useUserStore = defineStore('user', () => {
         encrypted_data: e.detail.encryptedData,
         iv: e.detail.iv,
       })
-      if (userInfo.value) userInfo.value.phone = res.data.phone
+      if (userInfo.value) {
+        userInfo.value.phone = res.data.phone
+        persistUserInfo()
+      }
       uni.showToast({ title: '手机号绑定成功', icon: 'success' })
     } catch (e) {
       console.error('手机号绑定失败', e)
@@ -110,6 +122,7 @@ export const useUserStore = defineStore('user', () => {
     if (userInfo.value) {
       userInfo.value.nickname = res.data.nickname
       userInfo.value.avatar_url = res.data.avatar_url
+      persistUserInfo()
     }
     showProfileSetup.value = false
     return res.data
@@ -130,6 +143,7 @@ export const useUserStore = defineStore('user', () => {
     token.value = ''
     userInfo.value = null
     uni.removeStorageSync('mp_token')
+    uni.removeStorageSync('mp_user_info')
   }
 
   // 等待登录就绪（页面发起业务请求前调用，避免 token 未就绪时被 401）

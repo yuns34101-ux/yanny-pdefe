@@ -46,6 +46,9 @@ func MpReportView(c *gin.Context) {
 		return
 	}
 
+	// 同步更新视频表的播放次数（view_logs 只存明细，videos.view_count 供列表排序/展示）
+	_ = repository.IncrementVideoViewCount(req.VideoID)
+
 	dto.Success(c, nil)
 }
 

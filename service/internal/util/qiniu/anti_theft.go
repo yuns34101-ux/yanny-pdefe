@@ -31,14 +31,14 @@ func SignURL(rawURL, process string, ttl time.Duration) string {
 	}
 
 	// 构造待签名 URL：<base>?<process>&e=<deadline>
-	url := baseURL
-	if process != "" {
-		// 处理参数之间用 | 分隔，最终拼成一个 ?process&e=deadline 的格式
-		url = baseURL + "?" + process
-	}
-
+	// process 为空时 e 是第一个查询参数，必须用 ? 而非 &，否则七牛无法解析出签名参数导致 403
 	deadline := time.Now().Add(ttl).Unix()
-	urlToSign := fmt.Sprintf("%s&e=%d", url, deadline)
+	var urlToSign string
+	if process != "" {
+		urlToSign = fmt.Sprintf("%s?%s&e=%d", baseURL, process, deadline)
+	} else {
+		urlToSign = fmt.Sprintf("%s?e=%d", baseURL, deadline)
+	}
 
 	mac := hmac.New(sha1.New, []byte(cfg.SecretKey))
 	mac.Write([]byte(urlToSign))

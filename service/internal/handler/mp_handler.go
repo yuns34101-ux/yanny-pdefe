@@ -96,5 +96,6 @@ func MpLogin(c *gin.Context) {
 		IsNewUser: isNew,
 		Nickname:  user.Nickname,
 		AvatarURL: user.AvatarURL,
+		Phone:     user.Phone,
 	})
 }

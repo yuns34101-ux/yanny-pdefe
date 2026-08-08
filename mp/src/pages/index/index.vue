@@ -5,7 +5,7 @@
       <view class="entity-header">
         <image class="entity-logo" :src="entity?.logo_url || '/static/logo.png'" mode="aspectFill" />
         <view class="entity-basic">
-          <text class="entity-name">{{ entity?.name || '扬昵 Yanny' }}</text>
+          <text class="entity-name">{{ entity?.name || '格物山夏山野民艺' }}</text>
         </view>
       </view>
       <text class="entity-desc" v-if="entity?.description">{{ entity.description }}</text>
@@ -95,7 +95,7 @@ const loading = computed(() => videoStore.loading)
 const hasMore = computed(() => videoStore.hasMore)
 
 const allCategory = computed(() => [
-  { id: 0, name: '精选' },
+  { id: 0, name: '全部' },
   ...videoStore.categories,
 ])
 
@@ -161,7 +161,7 @@ let mounted = false
 onMounted(async () => {
   await userStore.waitForReady()
   await entityStore.fetchEntityInfo()
-  uni.setNavigationBarTitle({ title: entityStore.entity?.name || '扬昵 Yanny' })
+  // uni.setNavigationBarTitle({ title: entityStore.entity?.name || '扬昵 Yanny' })
   videoStore.fetchVideos(activeCategory.value)
   videoStore.fetchCategories(1, 1)
   mounted = true
@@ -175,7 +175,7 @@ onShow(() => {
 
 // 首页分享：卡片用主体信息（logo + 名称），带入邀请人 ID 实现分享裂变
 onShareAppMessage(() => ({
-  title: entity.value?.name || '扬昵 Yanny',
+  title: entity.value?.name || '格物山夏山野民艺',
   imageUrl: entity.value?.logo_url || '',
   path: `/pages/index/index?inviter=${userStore.userId}`,
 }))

@@ -22,6 +22,7 @@ type MpLoginResponse struct {
 	IsNewUser  bool   `json:"is_new_user"`
 	Nickname   string `json:"nickname"`
 	AvatarURL  string `json:"avatar_url"`
+	Phone      string `json:"phone"`
 }
 
 // MpUserInfoResponse 小程序用户信息
